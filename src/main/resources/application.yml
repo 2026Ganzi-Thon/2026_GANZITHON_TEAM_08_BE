@@ -1,6 +1,14 @@
 spring:
   application:
     name: ganzithon-team08
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
 
 server:
   port: ${SERVER_PORT:8080}

@@ -13,6 +13,8 @@ Kotlin과 Spring Boot 기반 백엔드 프로젝트입니다.
 
 JDK 21을 설치하고 `JAVA_HOME`이 해당 JDK를 가리키도록 설정합니다. Gradle은 별도로 설치할 필요가 없습니다. 처음 빌드할 때 Wrapper와 의존성을 내려받으므로 인터넷 연결이 필요합니다.
 
+Kotlin JPA 플러그인을 사용해 엔티티의 기본 생성자와 프록시 지원을 구성합니다.
+
 macOS에서는 다음과 같이 JDK를 선택할 수 있습니다.
 
 ```sh
@@ -28,6 +30,8 @@ IntelliJ IDEA에서는 프로젝트 루트를 열고 Project SDK와 Gradle JVM�
 ```sh
 ./gradlew bootRun
 ```
+
+기본 프로필은 `local`입니다. H2 메모리 DB를 사용하며 실행할 때 테이블을 생성하고 종료하면 데이터가 사라집니다. 로컬 확인용 설정이므로 영구 데이터 저장 용도로 사용하지 않습니다.
 
 기본 포트는 `8080`입니다. 포트를 바꾸려면 `SERVER_PORT` 환경변수를 지정합니다.
 
@@ -51,7 +55,7 @@ curl http://localhost:8080/actuator/health
 java -jar build/libs/ganzithon-team08-0.0.1-SNAPSHOT.jar
 ```
 
-Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용합니다. 테스트는 전체 Spring 컨텍스트를 구동하고 MockMvc로 상태 확인 API를 검증합니다. 테스트 결과는 `build/reports/tests/test/index.html`에서 확인합니다.
+Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용합니다. 테스트는 `test` 프로필에서 실행하며, 전체 Spring 컨텍스트의 상태 확인 API와 H2 기반 JPA 저장·조회, 지연 로딩, 변경 감지, 중복 제약을 검증합니다. 테스트 결과는 `build/reports/tests/test/index.html`에서 확인합니다.
 
 GitHub Actions는 PR과 `main` 브랜치 push 시 Java 21에서 `clean build`를 실행하며, 수동 실행도 지원합니다. 워크플로는 저장소에 반영된 이후 실행됩니다.
 
@@ -61,23 +65,77 @@ GitHub Actions는 PR과 `main` 브랜치 push 시 Java 21에서 `clean build`를
 - Validation: 요청 DTO의 입력값 검증을 지원합니다.
 - Jackson Kotlin: Kotlin 객체와 JSON을 변환합니다.
 - Actuator: 애플리케이션 상태를 확인합니다.
+- Spring Data JPA: Hibernate를 통한 엔티티 매핑을 지원합니다.
+- H2: 로컬 실행과 테스트에 사용할 메모리 DB를 제공합니다.
 - JUnit과 Spring Boot Test: 테스트를 실행합니다.
 
 ```text
 src/
 ├── main/
 │   ├── kotlin/com/ganzithon/team08/
-│   │   └── GanzithonTeam08Application.kt
+│   │   ├── GanzithonTeam08Application.kt
+│   │   └── domain/
+│   │       ├── certification/
+│   │       ├── cheer/
+│   │       ├── cleanup/
+│   │       ├── common/
+│   │       ├── group/
+│   │       ├── mission/
+│   │       ├── onboarding/
+│   │       └── user/
 │   └── resources/
-│       └── application.yml
+│       ├── application.yml
+│       └── application-local.yml
 └── test/
-    └── kotlin/com/ganzithon/team08/
-        └── GanzithonTeam08ApplicationTests.kt
+    ├── kotlin/com/ganzithon/team08/
+    │   ├── GanzithonTeam08ApplicationTests.kt
+    │   └── domain/
+    └── resources/application-test.yml
 ```
 
-새 기능은 `com.ganzithon.team08` 아래에 추가하면 기본 컴포넌트 스캔에 포함됩니다. DB, 인증, 업무 도메인, 배포 환경은 요구사항에 맞춰 추가할 예정이며 현재는 외부 서비스 없이 실행할 수 있습니다.
+새 기능은 `com.ganzithon.team08` 아래에 추가하면 기본 컴포넌트 스캔에 포함됩니다. 현재는 엔티티와 상태 확인 API를 제공하며, 업무용 API·서비스·Repository·카카오 인증·이미지 저장·재시도 작업 실행기는 아직 구현하지 않았습니다.
 
 공통 설정은 `application.yml`에서 관리합니다. 비밀번호와 API 키는 환경변수 등 외부 설정으로 주입하며 저장소에 기록하지 않습니다. `.env` 파일은 Git에서 제외되지만 Spring Boot가 자동으로 읽지는 않습니다. 실행 환경이나 IDE에서 환경변수를 설정해야 합니다.
+
+## JPA 엔티티
+
+[API 명세서](https://app.notion.com/p/API-404d92dce83b80d4b2fdd0303a0843d4)의 요청·응답과 정책을 바탕으로 구성했습니다.
+
+| 엔티티 | 테이블 | 역할과 주요 관계 |
+| --- | --- | --- |
+| `User` | `users` | 카카오 식별자, 닉네임, 온보딩 상태, 생활 단계, 돌봄 선호, 현재 유형·그룹. |
+| `UserType` | `user_types` | 기본 유형의 코드·이름·설명. |
+| `OnboardingQuestion` | `onboarding_questions` | 1~4번 질문과 A/B 선택지. |
+| `OnboardingAnswer` | `onboarding_answers` | 사용자·질문별 마지막 A/B 응답. |
+| `CareGroup` | `care_groups` | 생활 단계와 기본 유형에 따른 그룹. |
+| `Mission` | `missions` | 개인·그룹 미션 원본의 종류와 제목. |
+| `MissionAssignment` | `mission_assignments` | 개인의 하루 또는 그룹의 한 주에 대한 미션 배정. |
+| `Certification` | `certifications` | 작성자·배정·미션 기준 날짜·사진 저장 키·글·공개 범위. |
+| `Cheer` | `cheers` | 사용자와 인증을 연결하는 일회성 응원. |
+| `CleanupTask` | `cleanup_tasks` | 이미지 삭제·카카오 연결 해제의 상태와 재시도 정보. |
+
+모든 엔티티는 `BaseTimeEntity`의 생성·수정 시각(`Instant`)과 낙관적 잠금 버전을 사용합니다. 연관관계는 단방향 `ManyToOne` 지연 로딩이며 자동 연쇄 삭제를 설정하지 않았습니다. Enum은 문자열로 저장합니다.
+
+DB 제약은 다음과 같습니다.
+
+- 카카오 사용자 식별자는 중복될 수 없습니다.
+- 질문 응답은 사용자·질문 조합당 하나입니다.
+- 개인 미션 배정은 사용자·날짜당 하나, 그룹 미션 배정은 그룹·주 기준일당 하나입니다.
+- 배정 대상은 사용자 또는 그룹 중 정확히 하나입니다. 그룹 미션은 생성 시 월요일을 기준일로 받습니다.
+- 인증은 사용자·미션 종류·기준 날짜당 하나입니다. 그룹이 바뀌어도 같은 주의 그룹 인증은 중복되지 않습니다.
+- 응원은 사용자·인증 조합당 하나이며, 엔티티 생성 시 본인 응원을 거부합니다.
+
+미션 원본과 배정을 분리했습니다. `Mission.missionId`는 원본 ID, `MissionAssignment.assignmentId`는 배정 ID입니다. 인증은 `assignment`를 참조하고, 중복 인증 방지를 위해 배정 당시의 `missionType`과 `missionDate`를 변경 불가 필드로 함께 저장합니다. 인증 API에서 원본 `missionId`를 받으면 사용자·미션 종류·해당 일/주 기준으로 배정을 찾아 연결해야 합니다. 날짜 경계와 타임존 처리는 API·서비스 구현 시 확정해야 합니다.
+
+사용자의 유형·그룹을 변경해도 기존 개인 미션 배정은 변경되지 않습니다. `CareGroup`에는 같은 생활 단계·유형의 그룹을 여러 개 생성할 수 있도록 조합 유니크 제약을 두지 않았습니다. 그룹 정원과 재매칭 알고리즘, 유형 분류 규칙과 실제 질문·유형 데이터는 아직 정하지 않았습니다.
+
+응원 수, 현재 사용자의 응원 여부, 스트릭, 달력 완료 여부는 별도 저장 필드로 만들지 않았습니다. 인증 기록에서 그룹 미션의 주 기준일과 실제 작성 날짜(`createdAt`)를 구분해야 합니다. 재매칭 후 기존 GROUP 공개 인증의 열람 정책과 업로드 파일 형식·크기 검증은 API·서비스 계층에서 구현해야 합니다.
+
+`CleanupTask.targetReference`에는 이미지 저장 키 또는 카카오 사용자 식별자를 보관합니다. 사용자와 외래 키로 연결하지 않아 사용자 데이터 삭제 후에도 재시도 정보를 유지합니다. 작업 예약·실행 및 탈퇴 시 세션 무효화와 연관 데이터 삭제는 별도 서비스 구현 대상입니다.
+
+## 운영 DB 연결
+
+운영 DB 종류와 마이그레이션 도구는 아직 선택하지 않았습니다. 운영 DB를 정하면 JDBC 드라이버 의존성, 스키마 마이그레이션, 접속 환경변수를 추가해야 합니다. 운영 실행 시에는 `SPRING_PROFILES_ACTIVE`를 `local`이 아닌 값으로 지정합니다. 공통 설정은 `ddl-auto: validate`이므로 운영에서는 스키마를 자동 생성·삭제하지 않고 검사합니다. H2 테스트 통과가 운영 DB에서의 호환성 검증을 대신하지는 않습니다.
 
 ## 버전 기준
 

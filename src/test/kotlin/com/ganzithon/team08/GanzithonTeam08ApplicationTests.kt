@@ -7,9 +7,11 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.context.ActiveProfiles
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class GanzithonTeam08ApplicationTests @Autowired constructor(
     private val mockMvc: MockMvc,
 ) {

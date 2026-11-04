@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    generate-unique-name: true
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate.hbm2ddl.halt_on_error: true
