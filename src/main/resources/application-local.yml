@@ -1,8 +1,5 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:ganzithon;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password: ""
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
+    url: ${DB_URL:jdbc:mysql://localhost:3306/ganzithon}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}

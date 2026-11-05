@@ -27,11 +27,27 @@ IntelliJ IDEA에서는 프로젝트 루트를 열고 Project SDK와 Gradle JVM�
 
 ## 실행
 
+MySQL 서버에 `ganzithon` 데이터베이스를 먼저 생성합니다. DB 계정에는 해당 데이터베이스의 테이블 생성·변경 및 데이터 조회·수정 권한이 필요합니다.
+
+```sql
+CREATE DATABASE ganzithon CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+```
+
+접속 계정과 비밀번호를 환경변수로 설정하고 실행합니다. 아래 예시 값은 실제 MySQL 계정 정보로 바꿉니다.
+
 ```sh
+export DB_USERNAME='your_mysql_username'
+export DB_PASSWORD='your_mysql_password'
 ./gradlew bootRun
 ```
 
-기본 프로필은 `local`입니다. H2 메모리 DB를 사용하며 실행할 때 테이블을 생성하고 종료하면 데이터가 사라집니다. 로컬 확인용 설정이므로 영구 데이터 저장 용도로 사용하지 않습니다.
+기본 프로필은 `local`이며 MySQL을 사용합니다. 기본 접속 주소는 `jdbc:mysql://localhost:3306/ganzithon`입니다. 다른 서버나 데이터베이스를 사용하려면 `DB_URL` 환경변수를 지정합니다.
+
+```sh
+export DB_URL='jdbc:mysql://localhost:3306/ganzithon'
+```
+
+Hibernate의 `ddl-auto: update` 설정으로 실행 시 엔티티에 맞춰 테이블을 생성하거나 변경합니다. 애플리케이션 종료 시 테이블을 삭제하지 않습니다. 데이터베이스 자체와 접속 계정은 자동으로 생성하지 않습니다.
 
 기본 포트는 `8080`입니다. 포트를 바꾸려면 `SERVER_PORT` 환경변수를 지정합니다.
 
@@ -55,7 +71,7 @@ curl http://localhost:8080/actuator/health
 java -jar build/libs/ganzithon-team08-0.0.1-SNAPSHOT.jar
 ```
 
-Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용합니다. 테스트는 `test` 프로필에서 실행하며, 전체 Spring 컨텍스트의 상태 확인 API와 H2 기반 JPA 저장·조회, 지연 로딩, 변경 감지, 중복 제약을 검증합니다. 테스트 결과는 `build/reports/tests/test/index.html`에서 확인합니다.
+Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용합니다. 테스트는 `test` 프로필의 H2 메모리 DB와 `create-drop` 설정을 사용하므로 MySQL 서버나 접속 환경변수 없이 실행할 수 있습니다. 전체 Spring 컨텍스트의 상태 확인 API와 JPA 저장·조회, 지연 로딩, 변경 감지, 중복 제약을 검증합니다. 테스트 결과는 `build/reports/tests/test/index.html`에서 확인합니다. JAR 실행에는 위의 MySQL 접속 설정이 필요합니다.
 
 GitHub Actions는 PR과 `main` 브랜치 push 시 Java 21에서 `clean build`를 실행하며, 수동 실행도 지원합니다. 워크플로는 저장소에 반영된 이후 실행됩니다.
 
@@ -66,7 +82,8 @@ GitHub Actions는 PR과 `main` 브랜치 push 시 Java 21에서 `clean build`를
 - Jackson Kotlin: Kotlin 객체와 JSON을 변환합니다.
 - Actuator: 애플리케이션 상태를 확인합니다.
 - Spring Data JPA: Hibernate를 통한 엔티티 매핑을 지원합니다.
-- H2: 로컬 실행과 테스트에 사용할 메모리 DB를 제공합니다.
+- MySQL Connector/J: 애플리케이션에서 MySQL에 연결하는 JDBC 드라이버입니다.
+- H2: 테스트 전용 메모리 DB입니다. 실행용 JAR에는 포함하지 않습니다.
 - JUnit과 Spring Boot Test: 테스트를 실행합니다.
 
 ```text
@@ -133,9 +150,20 @@ DB 제약은 다음과 같습니다.
 
 `CleanupTask.targetReference`에는 이미지 저장 키 또는 카카오 사용자 식별자를 보관합니다. 사용자와 외래 키로 연결하지 않아 사용자 데이터 삭제 후에도 재시도 정보를 유지합니다. 작업 예약·실행 및 탈퇴 시 세션 무효화와 연관 데이터 삭제는 별도 서비스 구현 대상입니다.
 
-## 운영 DB 연결
+## DB 설정
 
-운영 DB 종류와 마이그레이션 도구는 아직 선택하지 않았습니다. 운영 DB를 정하면 JDBC 드라이버 의존성, 스키마 마이그레이션, 접속 환경변수를 추가해야 합니다. 운영 실행 시에는 `SPRING_PROFILES_ACTIVE`를 `local`이 아닌 값으로 지정합니다. 공통 설정은 `ddl-auto: validate`이므로 운영에서는 스키마를 자동 생성·삭제하지 않고 검사합니다. H2 테스트 통과가 운영 DB에서의 호환성 검증을 대신하지는 않습니다.
+| 설정 | 값 |
+| --- | --- |
+| 기본 DB | MySQL. |
+| `DB_URL` | `local` 프로필의 JDBC URL. 기본값은 `jdbc:mysql://localhost:3306/ganzithon`. |
+| `DB_USERNAME` | `local` 프로필의 DB 계정. 필수. |
+| `DB_PASSWORD` | `local` 프로필의 DB 비밀번호. 필수. |
+| 공통 `ddl-auto` | `update`. |
+| 테스트 DB | H2 메모리 DB, `create-drop`. |
+
+`SPRING_PROFILES_ACTIVE`로 별도 프로필을 사용하면 해당 프로필에 접속 설정을 추가하거나 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` 환경변수로 지정합니다. 공통 테이블 생성 방식은 `update`를 사용합니다. 별도 마이그레이션 도구는 추가하지 않았습니다.
+
+`update`는 스키마 변경 이력을 관리하지 않으며 컬럼 이름 변경이나 데이터 변환까지 처리하지 않습니다. 이런 변경은 별도 SQL로 처리해야 합니다. H2 테스트 통과가 실제 MySQL에서의 호환성 검증을 대신하지는 않습니다.
 
 ## 버전 기준
 
