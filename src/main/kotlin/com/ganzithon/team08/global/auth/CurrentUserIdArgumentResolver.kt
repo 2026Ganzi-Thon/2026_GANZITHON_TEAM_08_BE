@@ -3,6 +3,7 @@ package com.ganzithon.team08.global.auth
 
 import com.ganzithon.team08.global.exception.BusinessException
 import com.ganzithon.team08.global.exception.CommonErrorCode
+import org.springframework.context.annotation.Profile
 import org.springframework.core.MethodParameter
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.support.WebDataBinderFactory
@@ -12,9 +13,10 @@ import org.springframework.web.method.support.ModelAndViewContainer
 
 /*
  * TODO: A파트 JWT 인증이 붙으면 이 리졸버를 걷어내고 인증 주체에서 사용자 ID를 읽도록 교체한다.
- * local 전용 임시 수단이며, 운영에서 신뢰할 수 없는 값이다.
+ * local 전용 임시 수단이며, 운영에서 신뢰할 수 없는 값이다. 다른 프로필에는 빈이 등록되지 않는다.
  */
 @Component
+@Profile("local")
 class CurrentUserIdArgumentResolver : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean =
         parameter.hasParameterAnnotation(CurrentUserId::class.java)
