@@ -2,6 +2,7 @@
 package com.ganzithon.team08.domain.certification
 
 import com.ganzithon.team08.domain.common.BaseTimeEntity
+import com.ganzithon.team08.domain.group.CareGroup
 import com.ganzithon.team08.domain.mission.MissionAssignment
 import com.ganzithon.team08.domain.mission.MissionType
 import com.ganzithon.team08.domain.user.User
@@ -31,6 +32,7 @@ import java.time.LocalDate
     indexes = [
         Index(name = "idx_certification_feed", columnList = "visibility,certification_id"),
         Index(name = "idx_certification_user_created", columnList = "user_id,created_at"),
+        Index(name = "idx_certification_group_feed", columnList = "group_id,visibility,certification_id"),
     ],
 )
 class Certification(
@@ -54,6 +56,11 @@ class Certification(
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "assignment_id", nullable = false, updatable = false)
     var assignment: MissionAssignment = assignment
+        protected set
+
+    @field:ManyToOne(fetch = FetchType.LAZY)
+    @field:JoinColumn(name = "group_id", updatable = false)
+    var group: CareGroup? = user.group
         protected set
 
     @field:Enumerated(EnumType.STRING)
@@ -93,6 +100,16 @@ class Certification(
     }
 
     private fun validateVisibility(visibility: Visibility) {
-        require(visibility != Visibility.GROUP || user.group != null) { "그룹 공개를 선택하려면 소속 그룹이 있어야 합니다." }
+        require(visibility != Visibility.GROUP || isInCurrentGroup()) {
+            "그룹 공개를 선택하려면 인증 당시 그룹이 현재 소속 그룹과 같아야 합니다."
+        }
+    }
+
+    // 그룹 재매칭·탈퇴로 인증 당시 그룹과 현재 소속 그룹이 달라지면 GROUP 공개를 막는다 (P15).
+    private fun isInCurrentGroup(): Boolean {
+        val certifiedGroup = group ?: return false
+        val currentGroup = user.group ?: return false
+        return certifiedGroup === currentGroup ||
+            (certifiedGroup.groupId != null && certifiedGroup.groupId == currentGroup.groupId)
     }
 }

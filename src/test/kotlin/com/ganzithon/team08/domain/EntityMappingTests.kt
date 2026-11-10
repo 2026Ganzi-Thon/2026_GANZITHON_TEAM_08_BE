@@ -60,6 +60,7 @@ class EntityMappingTests @Autowired constructor(private val entityManager: Entit
         assertEquals("포근한양", loaded.user.nickname)
         assertEquals("산책하기", loaded.assignment.mission.missionTitle)
         assertEquals(fixture.group.groupId, loaded.user.group?.groupId)
+        assertEquals(fixture.group.groupId, loaded.group?.groupId)
         assertEquals("TYPE_01", loaded.user.userType?.typeCode)
         assertEquals(MissionType.PERSONAL, loaded.missionType)
         assertEquals(monday, loaded.missionDate)
@@ -208,6 +209,7 @@ class EntityMappingTests @Autowired constructor(private val entityManager: Entit
 
         val loaded = entityManager.find(Certification::class.java, certification.certificationId)
         assertEquals(newGroup.groupId, loaded.user.group?.groupId)
+        assertEquals(fixture.group.groupId, loaded.group?.groupId)
         assertEquals(fixture.assignment.assignmentId, loaded.assignment.assignmentId)
         assertEquals(monday, loaded.missionDate)
         assertEquals(Visibility.PUBLIC, loaded.visibility)
