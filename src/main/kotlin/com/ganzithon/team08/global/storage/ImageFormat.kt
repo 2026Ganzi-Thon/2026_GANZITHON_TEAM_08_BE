@@ -25,5 +25,8 @@ enum class ImageFormat(val extension: String) {
 
         private fun ByteArray.startsWith(signature: ByteArray): Boolean =
             size >= signature.size && copyOfRange(0, signature.size).contentEquals(signature)
+
+        // 저장 키의 확장자로 이미지를 다시 서빙할 때 Content-Type을 정하는 데 쓴다.
+        fun fromExtension(extension: String): ImageFormat? = entries.firstOrNull { it.extension == extension }
     }
 }

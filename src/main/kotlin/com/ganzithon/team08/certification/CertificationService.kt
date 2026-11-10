@@ -1,11 +1,13 @@
 // 미션 인증 등록을 처리한다: 사진·글 검증, 배정 확인, 저장, 중복 변환.
 package com.ganzithon.team08.certification
 
+import com.ganzithon.team08.certification.dto.CertificationDetailResponse
 import com.ganzithon.team08.certification.dto.CertificationRegisterRequest
 import com.ganzithon.team08.certification.dto.CertificationRegisterResponse
 import com.ganzithon.team08.domain.certification.Certification
 import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
+import com.ganzithon.team08.domain.cheer.CheerRepository
 import com.ganzithon.team08.domain.mission.MissionAssignmentService
 import com.ganzithon.team08.domain.user.User
 import com.ganzithon.team08.domain.user.UserRepository
@@ -24,6 +26,7 @@ import java.time.ZoneId
 class CertificationService(
     private val userRepository: UserRepository,
     private val certificationRepository: CertificationRepository,
+    private val cheerRepository: CheerRepository,
     private val missionAssignmentService: MissionAssignmentService,
     private val imageStorage: ImageStorage,
 ) {
@@ -58,6 +61,47 @@ class CertificationService(
 
         return CertificationRegisterResponse.from(saved)
     }
+
+    @Transactional(readOnly = true)
+    fun getDetail(viewerId: Long, certificationId: Long): CertificationDetailResponse {
+        val viewer = getUser(viewerId)
+        val certification = getCertificationOrThrow(certificationId)
+        if (!certification.isVisibleTo(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
+        return toDetailResponse(certification, viewer)
+    }
+
+    @Transactional(readOnly = true)
+    fun getImage(viewerId: Long, certificationId: Long): Pair<ByteArray, ImageFormat> {
+        val viewer = getUser(viewerId)
+        val certification = getCertificationOrThrow(certificationId)
+        if (!certification.isVisibleTo(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
+        val bytes = imageStorage.load(certification.imageStorageKey)
+        val format = requireNotNull(ImageFormat.fromExtension(certification.imageStorageKey.substringAfterLast('.')))
+        return bytes to format
+    }
+
+    @Transactional
+    fun changeVisibility(viewerId: Long, certificationId: Long, visibility: Visibility): CertificationDetailResponse {
+        val viewer = getUser(viewerId)
+        val certification = getCertificationOrThrow(certificationId)
+        if (!certification.isOwnedBy(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
+        try {
+            certification.changeVisibility(visibility)
+        } catch (ex: IllegalArgumentException) {
+            throw BusinessException(CertificationErrorCode.CERT_INVALID_VISIBILITY)
+        }
+        return toDetailResponse(certification, viewer)
+    }
+
+    private fun toDetailResponse(certification: Certification, viewer: User): CertificationDetailResponse {
+        val certificationId = requireNotNull(certification.certificationId)
+        val cheerCount = cheerRepository.countByCertification_CertificationId(certificationId)
+        val cheered = cheerRepository.existsByUser_UserIdAndCertification_CertificationId(viewer.userId!!, certificationId)
+        return CertificationDetailResponse.from(certification, cheerCount, cheered, certification.isOwnedBy(viewer))
+    }
+
+    private fun getCertificationOrThrow(certificationId: Long): Certification =
+        certificationRepository.findById(certificationId).orElseThrow { BusinessException(CertificationErrorCode.CERT_NOT_FOUND) }
 
     private fun getUser(userId: Long): User =
         userRepository.findById(userId).orElseThrow { BusinessException(CommonErrorCode.NOT_FOUND) }

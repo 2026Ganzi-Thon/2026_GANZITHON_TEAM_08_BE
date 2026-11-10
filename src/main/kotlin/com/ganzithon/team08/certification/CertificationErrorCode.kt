@@ -14,6 +14,8 @@ enum class CertificationErrorCode(
     MISSION_NOT_ASSIGNED(HttpStatus.FORBIDDEN, "본인 또는 현재 그룹에 배정되지 않은 미션입니다."),
     MISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 미션입니다."),
     CERT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 인증을 완료했습니다."),
+    CERT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 인증입니다."),
+    CERT_FORBIDDEN(HttpStatus.FORBIDDEN, "볼 수 없거나 변경할 수 없는 인증입니다."),
     ;
 
     override val code: String get() = name

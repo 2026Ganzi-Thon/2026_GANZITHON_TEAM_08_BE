@@ -99,6 +99,19 @@ class Certification(
         this.visibility = visibility
     }
 
+    fun isOwnedBy(viewer: User): Boolean =
+        user === viewer || (user.userId != null && user.userId == viewer.userId)
+
+    // 상세·이미지 조회, 응원에서 공통으로 쓰는 열람 권한 규칙이다.
+    fun isVisibleTo(viewer: User): Boolean {
+        if (isOwnedBy(viewer)) return true
+        return when (visibility) {
+            Visibility.PUBLIC -> true
+            Visibility.GROUP -> isInCurrentGroup() && sameGroup(viewer.group)
+            Visibility.PRIVATE -> false
+        }
+    }
+
     private fun validateVisibility(visibility: Visibility) {
         require(visibility != Visibility.GROUP || isInCurrentGroup()) {
             "그룹 공개를 선택하려면 인증 당시 그룹이 현재 소속 그룹과 같아야 합니다."
@@ -106,10 +119,11 @@ class Certification(
     }
 
     // 그룹 재매칭·탈퇴로 인증 당시 그룹과 현재 소속 그룹이 달라지면 GROUP 공개를 막는다 (P15).
-    private fun isInCurrentGroup(): Boolean {
+    private fun isInCurrentGroup(): Boolean = sameGroup(user.group)
+
+    private fun sameGroup(other: CareGroup?): Boolean {
         val certifiedGroup = group ?: return false
-        val currentGroup = user.group ?: return false
-        return certifiedGroup === currentGroup ||
-            (certifiedGroup.groupId != null && certifiedGroup.groupId == currentGroup.groupId)
+        val target = other ?: return false
+        return certifiedGroup === target || (certifiedGroup.groupId != null && certifiedGroup.groupId == target.groupId)
     }
 }
