@@ -6,3 +6,7 @@ spring:
       ddl-auto: create-drop
     properties:
       hibernate.hbm2ddl.halt_on_error: true
+
+app:
+  image:
+    storage-dir: build/test-images

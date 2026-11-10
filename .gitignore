@@ -44,3 +44,6 @@ out/
 !.env.example
 *.log
 .DS_Store
+
+### 로컬 이미지 저장소 (IMAGE_STORAGE_DIR 기본값) ###
+/data/
