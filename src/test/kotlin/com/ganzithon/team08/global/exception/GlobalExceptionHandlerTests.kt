@@ -29,7 +29,9 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import kotlin.test.assertFalse
 
-@WebMvcTest
+// 컨트롤러를 지정하지 않으면 다른 도메인 컨트롤러까지 함께 뜨려다 그 컨트롤러의 의존성이 없어 실패한다.
+// TestController는 컴포넌트 스캔 대상이 아니므로 @Import로 직접 등록한다.
+@WebMvcTest(GlobalExceptionHandlerTests.TestController::class)
 @Import(GlobalExceptionHandlerTests.TestController::class)
 @ExtendWith(OutputCaptureExtension::class)
 class GlobalExceptionHandlerTests @Autowired constructor(private val mockMvc: MockMvc) {
