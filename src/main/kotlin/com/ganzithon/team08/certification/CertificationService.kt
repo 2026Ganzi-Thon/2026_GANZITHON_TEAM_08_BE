@@ -6,6 +6,7 @@ import com.ganzithon.team08.certification.dto.CertificationRegisterResponse
 import com.ganzithon.team08.domain.certification.Certification
 import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
+import com.ganzithon.team08.domain.mission.MissionAssignmentService
 import com.ganzithon.team08.domain.user.User
 import com.ganzithon.team08.domain.user.UserRepository
 import com.ganzithon.team08.global.exception.BusinessException
@@ -23,7 +24,7 @@ import java.time.ZoneId
 class CertificationService(
     private val userRepository: UserRepository,
     private val certificationRepository: CertificationRepository,
-    private val currentAssignmentFinder: CurrentAssignmentFinder,
+    private val missionAssignmentService: MissionAssignmentService,
     private val imageStorage: ImageStorage,
 ) {
     @Transactional
@@ -35,7 +36,7 @@ class CertificationService(
         }
 
         val referenceDate = LocalDate.now(SEOUL)
-        val assignment = currentAssignmentFinder.findCurrentAssignment(
+        val assignment = missionAssignmentService.findCurrentAssignment(
             userId,
             request.missionId,
             request.missionType,
