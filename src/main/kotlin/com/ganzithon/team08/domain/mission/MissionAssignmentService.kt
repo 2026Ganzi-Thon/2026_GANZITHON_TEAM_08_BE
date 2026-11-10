@@ -1,7 +1,6 @@
 // 현재 사용자(개인) 또는 현재 그룹(그룹)의 기준일 미션 배정을 조회한다.
 package com.ganzithon.team08.domain.mission
 
-import com.ganzithon.team08.certification.CertificationErrorCode
 import com.ganzithon.team08.domain.user.UserRepository
 import com.ganzithon.team08.global.exception.BusinessException
 import org.springframework.stereotype.Service
@@ -31,7 +30,7 @@ class MissionAssignmentService(
     ): MissionAssignment {
         val mission = missionRepository.findById(missionId)
             .filter { it.missionType == missionType }
-            .orElseThrow { BusinessException(CertificationErrorCode.MISSION_NOT_FOUND) }
+            .orElseThrow { BusinessException(MissionErrorCode.MISSION_NOT_FOUND) }
 
         val assignment = when (missionType) {
             MissionType.PERSONAL -> missionAssignmentRepository.findByMission_MissionIdAndUser_UserIdAndMissionDate(
@@ -51,7 +50,7 @@ class MissionAssignmentService(
             }
         }
 
-        return assignment ?: throw BusinessException(CertificationErrorCode.MISSION_NOT_ASSIGNED)
+        return assignment ?: throw BusinessException(MissionErrorCode.MISSION_NOT_ASSIGNED)
     }
 
     private fun weekStart(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))

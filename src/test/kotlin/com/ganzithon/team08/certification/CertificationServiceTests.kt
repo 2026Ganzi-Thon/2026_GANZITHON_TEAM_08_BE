@@ -12,6 +12,7 @@ import com.ganzithon.team08.domain.mission.Mission
 import com.ganzithon.team08.domain.mission.MissionAssignment
 import com.ganzithon.team08.domain.mission.MissionAssignmentRepository
 import com.ganzithon.team08.domain.mission.MissionAssignmentService
+import com.ganzithon.team08.domain.mission.MissionErrorCode
 import com.ganzithon.team08.domain.mission.MissionRepository
 import com.ganzithon.team08.domain.mission.MissionType
 import com.ganzithon.team08.domain.onboarding.AnswerChoice
@@ -128,7 +129,7 @@ class CertificationServiceTests @Autowired constructor(
             )
         }
 
-        assertEquals(CertificationErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
+        assertEquals(MissionErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
         assertTrue(storage.saved.isEmpty())
     }
 

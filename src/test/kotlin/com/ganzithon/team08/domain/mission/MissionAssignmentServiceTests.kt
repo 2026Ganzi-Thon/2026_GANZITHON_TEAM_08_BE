@@ -1,7 +1,6 @@
 // 개인·그룹 미션 배정 조회의 정상 처리와 기간·소속 불일치 실패를 검증한다.
 package com.ganzithon.team08.domain.mission
 
-import com.ganzithon.team08.certification.CertificationErrorCode
 import com.ganzithon.team08.domain.group.CareGroup
 import com.ganzithon.team08.domain.onboarding.AnswerChoice
 import com.ganzithon.team08.domain.user.LifeStage
@@ -63,7 +62,7 @@ class MissionAssignmentServiceTests @Autowired constructor(
             service.findCurrentAssignment(user.userId!!, 999_999L, MissionType.PERSONAL, monday)
         }
 
-        assertEquals(CertificationErrorCode.MISSION_NOT_FOUND, exception.errorCode)
+        assertEquals(MissionErrorCode.MISSION_NOT_FOUND, exception.errorCode)
     }
 
     @Test
@@ -75,7 +74,7 @@ class MissionAssignmentServiceTests @Autowired constructor(
             service.findCurrentAssignment(user.userId!!, groupMission.missionId!!, MissionType.PERSONAL, monday)
         }
 
-        assertEquals(CertificationErrorCode.MISSION_NOT_FOUND, exception.errorCode)
+        assertEquals(MissionErrorCode.MISSION_NOT_FOUND, exception.errorCode)
     }
 
     @Test
@@ -88,7 +87,7 @@ class MissionAssignmentServiceTests @Autowired constructor(
             service.findCurrentAssignment(user.userId!!, mission.missionId!!, MissionType.PERSONAL, monday.plusDays(1))
         }
 
-        assertEquals(CertificationErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
+        assertEquals(MissionErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
     }
 
     @Test
@@ -100,7 +99,7 @@ class MissionAssignmentServiceTests @Autowired constructor(
             service.findCurrentAssignment(user.userId!!, mission.missionId!!, MissionType.GROUP, monday)
         }
 
-        assertEquals(CertificationErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
+        assertEquals(MissionErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
     }
 
     @Test
@@ -116,7 +115,7 @@ class MissionAssignmentServiceTests @Autowired constructor(
             service.findCurrentAssignment(user.userId!!, mission.missionId!!, MissionType.GROUP, monday.plusWeeks(1))
         }
 
-        assertEquals(CertificationErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
+        assertEquals(MissionErrorCode.MISSION_NOT_ASSIGNED, exception.errorCode)
     }
 
     private fun <T : Any> persist(entity: T): T = entity.also { entityManager.persist(it) }
