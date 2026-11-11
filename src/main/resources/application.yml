@@ -19,6 +19,13 @@ jwt:
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:1209600}
 
+kakao:
+  client-id: ${KAKAO_CLIENT_ID}
+  client-secret: ${KAKAO_CLIENT_SECRET:}
+  redirect-uri: ${KAKAO_REDIRECT_URI}
+  frontend-onboarding-path: ${KAKAO_ONBOARDING_PATH:/onboarding}
+  frontend-home-path: ${KAKAO_HOME_PATH:/home}
+
 management:
   endpoints:
     web:
