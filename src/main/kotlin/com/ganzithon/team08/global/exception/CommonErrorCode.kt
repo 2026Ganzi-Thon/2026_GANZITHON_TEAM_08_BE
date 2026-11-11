@@ -8,6 +8,10 @@ enum class CommonErrorCode(
     override val message: String,
 ) : ErrorCode {
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 값을 확인해 주세요."),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+    ACCOUNT_WITHDRAWN(HttpStatus.FORBIDDEN, "탈퇴한 계정은 이용할 수 없습니다."),
+    CSRF_INVALID(HttpStatus.FORBIDDEN, "요청 검증에 실패했습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 메서드입니다."),
     CONFLICT(HttpStatus.CONFLICT, "요청이 현재 리소스 상태와 충돌합니다."),
