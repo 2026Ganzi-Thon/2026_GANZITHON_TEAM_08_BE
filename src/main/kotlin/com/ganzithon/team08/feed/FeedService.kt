@@ -52,7 +52,7 @@ class FeedService(
                 mine = certification.user.userId == viewerId,
             )
         }
-        return FeedResponse(items, certificationIds.last(), hasNext)
+        return FeedResponse(items, if (hasNext) certificationIds.last() else null, hasNext)
     }
 
     private fun getUser(userId: Long) =
