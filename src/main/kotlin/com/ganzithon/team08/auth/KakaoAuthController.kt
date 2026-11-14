@@ -41,7 +41,9 @@ class KakaoAuthController(
     ): ResponseEntity<Void> {
         if (error != null || code.isNullOrBlank()) throw BusinessException(AuthErrorCode.KAKAO_INVALID_CODE)
         val savedState = request.cookies?.firstOrNull { it.name == "OAUTH_STATE" }?.value
-        if (state != savedState) throw BusinessException(AuthErrorCode.KAKAO_INVALID_STATE)
+        if (state.isNullOrBlank() || savedState.isNullOrBlank() || state != savedState) {
+            throw BusinessException(AuthErrorCode.KAKAO_INVALID_STATE)
+        }
         val result = kakaoAuthService.login(code)
         val location = if (result.onboardingCompleted) "/home" else "/onboarding"
         return ResponseEntity.status(HttpStatus.FOUND)
@@ -49,6 +51,7 @@ class KakaoAuthController(
             .header(HttpHeaders.SET_COOKIE, authCookieUtils.accessToken(result.accessToken).toString())
             .header(HttpHeaders.SET_COOKIE, authCookieUtils.refreshToken(result.refreshToken).toString())
             .header(HttpHeaders.SET_COOKIE, authCookieUtils.csrfToken(newState()).toString())
+            .header(HttpHeaders.SET_COOKIE, authCookieUtils.expire("OAUTH_STATE").toString())
             .build()
     }
 
