@@ -21,14 +21,16 @@ interface CertificationRepository : JpaRepository<Certification, Long> {
         missionDate: LocalDate,
     ): Boolean
 
-    // 전체 피드(PUBLIC)를 최신순 커서 페이징으로 조회한다. 작성자·배정·미션을 함께 로딩해 N+1을 막는다.
+    // 전체 피드(PUBLIC)를 최신순 커서 페이징으로 조회한다. 탈퇴한 작성자의 인증은 숨긴다.
+    // 작성자·배정·미션을 함께 로딩해 N+1을 막는다.
     @Query(
         """
         select c from Certification c
-        join fetch c.user
+        join fetch c.user u
         join fetch c.assignment a
         join fetch a.mission
-        where c.visibility in :visibilities
+        where u.status = com.ganzithon.team08.domain.user.UserStatus.ACTIVE
+          and c.visibility in :visibilities
           and (:cursor is null or c.certificationId < :cursor)
         order by c.certificationId desc
         """,

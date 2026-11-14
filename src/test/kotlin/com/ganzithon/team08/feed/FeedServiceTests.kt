@@ -79,6 +79,21 @@ class FeedServiceTests @Autowired constructor(
     }
 
     @Test
+    fun feedExcludesCertificationsFromWithdrawnAuthors() {
+        val group = newGroup()
+        val viewer = newUser(group, "viewer")
+        val author = newUser(group, "author")
+        val post = certification(group, Visibility.PUBLIC, author)
+        entityManager.flush()
+        author.withdraw()
+        entityManager.flush()
+
+        val feed = service().getFeed(viewer.userId!!, null, 20)
+
+        assertTrue(feed.items.none { it.certificationId == post.certificationId })
+    }
+
+    @Test
     fun groupFeedIncludesCurrentGroupMembersGroupAndPublicCertifications() {
         val group = newGroup()
         val author = newUser(group, "author")
