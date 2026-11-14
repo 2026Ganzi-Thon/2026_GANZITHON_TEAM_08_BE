@@ -10,3 +10,5 @@ spring:
 app:
   image:
     storage-dir: build/test-images
+jwt:
+  secret: test-only-jwt-secret-must-be-at-least-32-bytes-long
