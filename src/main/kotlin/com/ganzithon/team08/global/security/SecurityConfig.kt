@@ -8,6 +8,9 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
+import org.springframework.security.web.csrf.CsrfToken
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler
+import java.util.function.Supplier
 
 @Configuration
 class SecurityConfig(
@@ -24,7 +27,11 @@ class SecurityConfig(
         }
 
         http
-            .csrf { csrf -> csrf.csrfTokenRepository(csrfRepository) }
+            .csrf { csrf ->
+                csrf
+                    .csrfTokenRepository(csrfRepository)
+                    .csrfTokenRequestHandler(PlainCsrfTokenRequestHandler())
+            }
             .sessionManagement { sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .formLogin { it.disable() }
             .httpBasic { it.disable() }
@@ -35,11 +42,25 @@ class SecurityConfig(
             }
             .authorizeHttpRequests { requests ->
                 requests
-                    .requestMatchers("/actuator/health", "/api/auth/kakao", "/api/auth/kakao/callback").permitAll()
+                    .requestMatchers("/actuator/health", "/api/auth/kakao", "/api/auth/kakao/callback", "/api/auth/refresh").permitAll()
                     .anyRequest().authenticated()
             }
             .addFilterBefore(JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }
+}
+
+private class PlainCsrfTokenRequestHandler : CsrfTokenRequestHandler {
+    override fun handle(
+        request: jakarta.servlet.http.HttpServletRequest,
+        response: jakarta.servlet.http.HttpServletResponse,
+        csrfToken: Supplier<CsrfToken>,
+    ) {
+        val token = csrfToken.get()
+        request.setAttribute(token.parameterName, token)
+    }
+
+    override fun resolveCsrfTokenValue(request: jakarta.servlet.http.HttpServletRequest, csrfToken: CsrfToken): String? =
+        request.getHeader(csrfToken.headerName)
 }

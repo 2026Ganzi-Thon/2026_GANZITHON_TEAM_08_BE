@@ -12,7 +12,10 @@ class RefreshTokenService(
     private val userRepository: UserRepository,
 ) {
     fun issueAccessToken(refreshToken: String): String {
-        val userId = runCatching { jwtProvider.parse(refreshToken).subject.toLong() }
+        val userId = runCatching {
+            jwtProvider.parse(refreshToken).takeIf(jwtProvider::isRefreshToken)?.subject?.toLong()
+                ?: throw IllegalArgumentException()
+        }
             .getOrElse { throw BusinessException(AuthErrorCode.REFRESH_TOKEN_INVALID) }
         val user = userRepository.findById(userId)
             .orElseThrow { BusinessException(AuthErrorCode.REFRESH_TOKEN_INVALID) }
