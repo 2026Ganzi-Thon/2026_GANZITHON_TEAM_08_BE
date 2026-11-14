@@ -41,19 +41,20 @@ interface CertificationRepository : JpaRepository<Certification, Long> {
         pageable: Pageable,
     ): List<Certification>
 
-    // 그룹 피드: 작성자의 현재 그룹이 viewer의 그룹과 같은 인증만 최신순 커서 페이징으로 조회한다.
-    // GROUP 공개는 인증 당시 그룹(c.group)도 viewer 그룹과 같아야 한다 — 작성자가 그룹을 옮기면
-    // 과거 GROUP 인증의 c.group은 그대로지만 u.group만 새 그룹으로 바뀌므로 둘 다 확인해야 함
-    // (회윤님 리뷰, PR #10). PUBLIC은 공개 정책상 현재 그룹원이면 과거 그룹 소속 글이라도 노출한다.
+    // 그룹 피드: 인증 당시 그룹(c.group)이 조회 그룹과 같은 인증만 최신순 커서 페이징으로 조회한다.
+    // PUBLIC·GROUP 모두 c.group 기준 — 작성자가 그룹을 옮겨도 예전 글이 새 그룹 피드에
+    // 자동으로 노출되지 않아야 함(회윤님 전달, 그룹 이동/탈퇴 정책 정리). GROUP은 추가로
+    // 작성자의 현재 그룹도 c.group과 같아야 포함(entity.isVisibleTo의 isInCurrentGroup과 동일 규칙 —
+    // 그룹을 떠나면 PRIVATE로 전환되지만, 전환 전 과도기에도 피드에선 바로 숨겨지도록 방어).
     @Query(
         """
         select c from Certification c
         join fetch c.user u
         join fetch c.assignment a
         join fetch a.mission
-        where u.group.groupId = :groupId
+        where c.group.groupId = :groupId
           and c.visibility in :visibilities
-          and (c.visibility <> com.ganzithon.team08.domain.certification.Visibility.GROUP or c.group.groupId = :groupId)
+          and (c.visibility <> com.ganzithon.team08.domain.certification.Visibility.GROUP or u.group.groupId = :groupId)
           and (:cursor is null or c.certificationId < :cursor)
         order by c.certificationId desc
         """,

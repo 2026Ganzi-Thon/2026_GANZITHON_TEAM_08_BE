@@ -34,7 +34,9 @@ class CertificationService(
     @Transactional
     fun register(userId: Long, request: CertificationRegisterRequest): CertificationRegisterResponse {
         val content = validateContent(request.content)
-        val user = getUser(userId)
+        // 그룹 변경(이동·탈퇴)과 같은 사용자 row 잠금을 사용해 동시성을 맞춘다 — 그룹 스냅샷을
+        // 읽는 동안 그룹이 바뀌면 안 되므로, 그룹 변경 트랜잭션도 같은 방식으로 잠궈야 한다.
+        val user = userRepository.findByIdForUpdate(userId) ?: throw BusinessException(CommonErrorCode.NOT_FOUND)
         if (request.visibility == Visibility.GROUP && user.group == null) {
             throw BusinessException(CertificationErrorCode.CERT_INVALID_VISIBILITY)
         }
