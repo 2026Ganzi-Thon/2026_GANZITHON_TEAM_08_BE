@@ -18,20 +18,33 @@ class JwtProvider(private val properties: JwtProperties) {
         Keys.hmacShaKeyFor(properties.secret.toByteArray(StandardCharsets.UTF_8))
     }
 
-    fun createAccessToken(userId: Long): String = createToken(userId, properties.accessTokenExpirationSeconds)
+    fun createAccessToken(userId: Long): String = createToken(userId, properties.accessTokenExpirationSeconds, ACCESS_TOKEN_USE)
 
-    fun createRefreshToken(userId: Long): String = createToken(userId, properties.refreshTokenExpirationSeconds)
+    fun createRefreshToken(userId: Long): String = createToken(userId, properties.refreshTokenExpirationSeconds, REFRESH_TOKEN_USE)
+
+    fun isAccessToken(claims: Claims): Boolean = claims["token_use"] == ACCESS_TOKEN_USE
+
+    fun isRefreshToken(claims: Claims): Boolean = claims["token_use"] == REFRESH_TOKEN_USE
 
     fun parse(token: String): Claims =
         Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload
 
-    private fun createToken(userId: Long, expirationSeconds: Long): String {
+    private fun createToken(userId: Long, expirationSeconds: Long, tokenUse: String) =
+        createTokenWithUse(userId, expirationSeconds, tokenUse)
+
+    private fun createTokenWithUse(userId: Long, expirationSeconds: Long, tokenUse: String): String {
         val now = Instant.now()
         return Jwts.builder()
             .subject(userId.toString())
+            .claim("token_use", tokenUse)
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plusSeconds(expirationSeconds)))
             .signWith(key)
             .compact()
+    }
+
+    companion object {
+        private const val ACCESS_TOKEN_USE = "access"
+        private const val REFRESH_TOKEN_USE = "refresh"
     }
 }

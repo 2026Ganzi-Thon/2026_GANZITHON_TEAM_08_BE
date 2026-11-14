@@ -16,8 +16,9 @@ class JwtAuthenticationFilter(private val jwtProvider: JwtProvider) : OncePerReq
     ) {
         val token = request.cookies?.firstOrNull { it.name == "ACCESS_TOKEN" }?.value
         if (token != null) {
-            runCatching { jwtProvider.parse(token).subject.toLong() }
+            runCatching { jwtProvider.parse(token).takeIf(jwtProvider::isAccessToken)?.subject?.toLong() }
                 .onSuccess { userId ->
+                    if (userId == null) return@onSuccess
                     val authentication = UsernamePasswordAuthenticationToken.authenticated(userId, null, emptyList())
                     SecurityContextHolder.getContext().authentication = authentication
                 }
