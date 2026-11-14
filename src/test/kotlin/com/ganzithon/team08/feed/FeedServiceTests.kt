@@ -129,6 +129,25 @@ class FeedServiceTests @Autowired constructor(
     }
 
     @Test
+    fun groupFeedExcludesPastGroupCertificationAfterAuthorJoinsViewersGroup() {
+        // 회윤님 리뷰(PR #10): 작성자가 A그룹에서 GROUP 공개 인증을 만든 뒤 B그룹으로 옮기면,
+        // 인증의 c.group은 여전히 A이므로 B그룹 구성원(viewer)에게 노출되면 안 된다.
+        val originalGroup = newGroup()
+        val author = newUser(originalGroup, "author")
+        val groupPost = certification(originalGroup, Visibility.GROUP, author)
+        entityManager.flush()
+
+        val newGroup = newGroup()
+        val viewer = newUser(newGroup, "viewer")
+        author.updateType(newGroup.lifeStage, newGroup.userType, AnswerChoice.A, newGroup)
+        entityManager.flush()
+
+        val feed = service().getGroupFeed(viewer.userId!!, null, 20)
+
+        assertTrue(feed.items.none { it.certificationId == groupPost.certificationId })
+    }
+
+    @Test
     fun groupFeedIsEmptyWhenViewerHasNoGroup() {
         val soloUser = persist(User("solo", "혼자양"))
         entityManager.flush()
