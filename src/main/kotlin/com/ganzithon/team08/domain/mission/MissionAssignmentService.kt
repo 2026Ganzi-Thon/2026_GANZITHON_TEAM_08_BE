@@ -5,9 +5,7 @@ import com.ganzithon.team08.domain.user.UserRepository
 import com.ganzithon.team08.global.exception.BusinessException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters
 
 @Service
 class MissionAssignmentService(
@@ -44,7 +42,7 @@ class MissionAssignmentService(
                     missionAssignmentRepository.findByMission_MissionIdAndGroup_GroupIdAndMissionDate(
                         mission.missionId!!,
                         it,
-                        weekStart(referenceDate),
+                        MissionPeriod.weekStart(referenceDate),
                     )
                 }
             }
@@ -52,6 +50,4 @@ class MissionAssignmentService(
 
         return assignment ?: throw BusinessException(MissionErrorCode.MISSION_NOT_ASSIGNED)
     }
-
-    private fun weekStart(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 }

@@ -9,6 +9,7 @@ import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
 import com.ganzithon.team08.domain.cheer.CheerRepository
 import com.ganzithon.team08.domain.mission.MissionAssignmentService
+import com.ganzithon.team08.domain.mission.MissionPeriod
 import com.ganzithon.team08.domain.user.User
 import com.ganzithon.team08.domain.user.UserRepository
 import com.ganzithon.team08.domain.user.UserStatus
@@ -20,8 +21,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
-import java.time.LocalDate
-import java.time.ZoneId
+import java.time.Instant
 
 @Service
 class CertificationService(
@@ -39,7 +39,7 @@ class CertificationService(
             throw BusinessException(CertificationErrorCode.CERT_INVALID_VISIBILITY)
         }
 
-        val referenceDate = LocalDate.now(SEOUL)
+        val referenceDate = MissionPeriod.dateAt(Instant.now())
         val assignment = missionAssignmentService.findCurrentAssignment(
             userId,
             request.missionId,
@@ -130,7 +130,6 @@ class CertificationService(
     }
 
     companion object {
-        private val SEOUL = ZoneId.of("Asia/Seoul")
         private const val MAX_CONTENT_LENGTH = 300
         private const val MAX_IMAGE_BYTES = 10L * 1024 * 1024
     }
