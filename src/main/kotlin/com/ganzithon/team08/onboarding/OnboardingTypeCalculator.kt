@@ -4,6 +4,7 @@ package com.ganzithon.team08.onboarding
 import com.ganzithon.team08.domain.onboarding.AnswerChoice
 import com.ganzithon.team08.global.exception.BusinessException
 import com.ganzithon.team08.global.exception.CommonErrorCode
+import org.springframework.stereotype.Component
 
 data class OnboardingAnswer(val questionId: Int, val choice: AnswerChoice)
 
@@ -12,6 +13,7 @@ data class OnboardingTypeResult(
     val carePreference: AnswerChoice,
 )
 
+@Component
 class OnboardingTypeCalculator {
     fun calculate(answers: List<OnboardingAnswer>): OnboardingTypeResult {
         validate(answers)
