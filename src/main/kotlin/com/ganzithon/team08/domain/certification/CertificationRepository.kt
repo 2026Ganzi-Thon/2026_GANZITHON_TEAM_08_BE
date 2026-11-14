@@ -1,4 +1,4 @@
-// 미션 인증을 저장하고 사용자·미션 종류·기준 날짜별 인증, 전체/그룹 피드를 조회한다.
+// 미션 인증을 저장하고 사용자·미션 종류·기준 날짜별 인증, 전체/그룹 피드, 날짜별 인증 목록과 스트릭용 인증일을 조회한다.
 package com.ganzithon.team08.domain.certification
 
 import com.ganzithon.team08.domain.mission.MissionType
@@ -63,5 +63,37 @@ interface CertificationRepository : JpaRepository<Certification, Long> {
         @Param("visibilities") visibilities: Collection<Visibility>,
         @Param("cursor") cursor: Long?,
         pageable: Pageable,
+    ): List<Certification>
+
+    // 월별 기록(개인/그룹 완료 여부)과 스트릭 계산에 쓸 인증 날짜만 모아 조회한다. start/end가 null이면 전체 기간(스트릭용).
+    @Query(
+        """
+        select c.missionDate from Certification c
+        where c.user.userId = :userId
+          and c.missionType = :missionType
+          and (:start is null or c.missionDate >= :start)
+          and (:end is null or c.missionDate <= :end)
+        """,
+    )
+    fun findMissionDates(
+        @Param("userId") userId: Long,
+        @Param("missionType") missionType: MissionType,
+        @Param("start") start: LocalDate?,
+        @Param("end") end: LocalDate?,
+    ): List<LocalDate>
+
+    // 날짜별 기록 조회: 해당 날짜의 내 인증 목록을 미션 제목과 함께 N+1 없이 가져온다.
+    @Query(
+        """
+        select c from Certification c
+        join fetch c.assignment a
+        join fetch a.mission
+        where c.user.userId = :userId and c.missionDate = :missionDate
+        order by c.missionType asc, c.certificationId asc
+        """,
+    )
+    fun findByUserAndMissionDate(
+        @Param("userId") userId: Long,
+        @Param("missionDate") missionDate: LocalDate,
     ): List<Certification>
 }
