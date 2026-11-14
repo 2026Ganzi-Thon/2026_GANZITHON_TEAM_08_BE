@@ -22,6 +22,15 @@ class AuthCookieUtils {
 
     fun expire(name: String): ResponseCookie = tokenCookie(name, "", 0)
 
+    fun expireCsrfToken(): ResponseCookie =
+        ResponseCookie.from("XSRF-TOKEN", "")
+            .httpOnly(false)
+            .secure(true)
+            .sameSite("Lax")
+            .path("/")
+            .maxAge(0)
+            .build()
+
     fun tokenCookie(name: String, value: String, maxAge: Long): ResponseCookie =
         ResponseCookie.from(name, value)
             .httpOnly(true)
