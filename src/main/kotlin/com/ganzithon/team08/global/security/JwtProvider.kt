@@ -29,10 +29,7 @@ class JwtProvider(private val properties: JwtProperties) {
     fun parse(token: String): Claims =
         Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload
 
-    private fun createToken(userId: Long, expirationSeconds: Long, tokenUse: String) =
-        createTokenWithUse(userId, expirationSeconds, tokenUse)
-
-    private fun createTokenWithUse(userId: Long, expirationSeconds: Long, tokenUse: String): String {
+    private fun createToken(userId: Long, expirationSeconds: Long, tokenUse: String): String {
         val now = Instant.now()
         return Jwts.builder()
             .subject(userId.toString())
