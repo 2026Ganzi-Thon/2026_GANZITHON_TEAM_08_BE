@@ -51,7 +51,7 @@ class SecurityConfig(
     }
 }
 
-private class PlainCsrfTokenRequestHandler : CsrfTokenRequestHandler {
+internal class PlainCsrfTokenRequestHandler : CsrfTokenRequestHandler {
     override fun handle(
         request: jakarta.servlet.http.HttpServletRequest,
         response: jakarta.servlet.http.HttpServletResponse,
