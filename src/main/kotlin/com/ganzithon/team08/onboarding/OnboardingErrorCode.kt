@@ -10,7 +10,8 @@ enum class OnboardingErrorCode(
 ) : ErrorCode {
     ONBOARDING_QUESTION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "온보딩 질문을 조회할 수 없습니다."),
     INVALID_ANSWER(HttpStatus.BAD_REQUEST, "온보딩 응답을 확인해 주세요."),
-    GROUP_MATCHING_NOT_READY(HttpStatus.SERVICE_UNAVAILABLE, "그룹 매칭 기능이 아직 준비되지 않았습니다.");
+    ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 온보딩을 완료했습니다."),
+    MATCHING_RETRY_REQUIRED(HttpStatus.SERVICE_UNAVAILABLE, "그룹 매칭을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.");
 
     override val code: String get() = name
 }
