@@ -19,6 +19,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import java.security.MessageDigest
 
 @Entity
 @Table(
@@ -74,6 +75,10 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
     var status: UserStatus = UserStatus.ACTIVE
         protected set
 
+    @field:Column(name = "refresh_token_hash", length = 64)
+    var refreshTokenHash: String? = null
+        protected set
+
     fun completeOnboarding(lifeStage: LifeStage, userType: UserType, carePreference: AnswerChoice, group: CareGroup) {
         check(!onboardingCompleted) { "이미 온보딩을 완료한 사용자입니다." }
         applyType(lifeStage, userType, carePreference, group)
@@ -88,6 +93,25 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
     fun withdraw() {
         status = UserStatus.WITHDRAWN
         group = null
+        refreshTokenHash = null
+    }
+
+    fun updateRefreshTokenHash(rawToken: String) {
+        refreshTokenHash = MessageDigest.getInstance("SHA-256")
+            .digest(rawToken.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    fun hasRefreshToken(rawToken: String): Boolean {
+        val storedHash = refreshTokenHash ?: return false
+        val rawHash = MessageDigest.getInstance("SHA-256")
+            .digest(rawToken.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return storedHash == rawHash
+    }
+
+    fun clearRefreshTokenHash() {
+        refreshTokenHash = null
     }
 
     private fun applyType(lifeStage: LifeStage, userType: UserType, carePreference: AnswerChoice, group: CareGroup) {
