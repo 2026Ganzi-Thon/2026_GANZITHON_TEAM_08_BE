@@ -13,6 +13,8 @@ enum class AuthErrorCode(
     KAKAO_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "카카오 인증에 실패했습니다."),
     KAKAO_API_ERROR(HttpStatus.BAD_GATEWAY, "카카오 API 호출에 실패했습니다."),
     ACCOUNT_WITHDRAWN(HttpStatus.FORBIDDEN, "탈퇴한 계정은 이용할 수 없습니다."),
+    REFRESH_TOKEN_MISSING(HttpStatus.UNAUTHORIZED, "Refresh Token이 없습니다."),
+    REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 Refresh Token입니다."),
     ;
 
     override val code: String get() = name

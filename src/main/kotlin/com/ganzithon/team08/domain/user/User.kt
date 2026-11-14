@@ -102,6 +102,14 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
             .joinToString("") { "%02x".format(it) }
     }
 
+    fun hasRefreshToken(rawToken: String): Boolean {
+        val storedHash = refreshTokenHash ?: return false
+        val rawHash = MessageDigest.getInstance("SHA-256")
+            .digest(rawToken.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return storedHash == rawHash
+    }
+
     fun clearRefreshTokenHash() {
         refreshTokenHash = null
     }
