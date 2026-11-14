@@ -8,6 +8,7 @@ import com.ganzithon.team08.domain.group.CareGroup
 import com.ganzithon.team08.domain.mission.Mission
 import com.ganzithon.team08.domain.mission.MissionAssignment
 import com.ganzithon.team08.domain.mission.MissionType
+import com.ganzithon.team08.domain.onboarding.AnswerChoice
 import com.ganzithon.team08.domain.user.LifeStage
 import com.ganzithon.team08.domain.user.User
 import com.ganzithon.team08.domain.user.UserType
@@ -53,6 +54,21 @@ class EntityRulesTests {
             Certification(user, assignment, "images/walk.jpg", "인증", Visibility.GROUP)
         }
         val certification = Certification(user, assignment, "images/walk.jpg", "인증")
+        assertThrows<IllegalArgumentException> { certification.changeVisibility(Visibility.GROUP) }
+    }
+
+    @Test
+    fun groupVisibilityIsRejectedAfterUserMovesToAnotherGroup() {
+        val type = UserType("TYPE_01", "유형 1", "설명")
+        val group = CareGroup(LifeStage.JOB_SEEKER, type)
+        val user = User("one", "양")
+        val assignment = MissionAssignment.forUser(Mission(MissionType.PERSONAL, "산책하기"), user, monday)
+        user.completeOnboarding(LifeStage.JOB_SEEKER, type, AnswerChoice.A, group)
+        val certification = Certification(user, assignment, "images/walk.jpg", "인증", Visibility.GROUP)
+
+        val newGroup = CareGroup(LifeStage.EARLY_CAREER, type)
+        user.updateType(LifeStage.EARLY_CAREER, type, AnswerChoice.B, newGroup)
+
         assertThrows<IllegalArgumentException> { certification.changeVisibility(Visibility.GROUP) }
     }
 }

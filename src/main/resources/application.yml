@@ -9,6 +9,14 @@ spring:
       ddl-auto: update
     properties:
       hibernate.jdbc.time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+
+app:
+  image:
+    storage-dir: ${IMAGE_STORAGE_DIR:./data/images}
 
 server:
   port: ${SERVER_PORT:8080}

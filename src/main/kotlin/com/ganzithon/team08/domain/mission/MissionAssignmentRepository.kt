@@ -8,4 +8,16 @@ interface MissionAssignmentRepository : JpaRepository<MissionAssignment, Long> {
     fun findByUser_UserIdAndMissionDate(userId: Long, missionDate: LocalDate): MissionAssignment?
 
     fun findByGroup_GroupIdAndMissionDate(groupId: Long, missionDate: LocalDate): MissionAssignment?
+
+    fun findByMission_MissionIdAndUser_UserIdAndMissionDate(
+        missionId: Long,
+        userId: Long,
+        missionDate: LocalDate,
+    ): MissionAssignment?
+
+    fun findByMission_MissionIdAndGroup_GroupIdAndMissionDate(
+        missionId: Long,
+        groupId: Long,
+        missionDate: LocalDate,
+    ): MissionAssignment?
 }
