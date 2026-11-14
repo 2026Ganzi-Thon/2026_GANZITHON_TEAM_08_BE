@@ -246,6 +246,39 @@ class CertificationServiceTests @Autowired constructor(
     }
 
     @Test
+    fun detailOfCertificationByWithdrawnAuthorIsNotFound() {
+        val fixture = fixture()
+        val certification = persist(certification(fixture))
+        certification.changeVisibility(Visibility.PUBLIC)
+        entityManager.flush()
+        fixture.user.withdraw()
+        entityManager.flush()
+
+        val exception = assertThrows<BusinessException> {
+            service(FakeImageStorage()).getDetail(fixture.otherUser.userId!!, certification.certificationId!!)
+        }
+
+        assertEquals(CertificationErrorCode.CERT_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun imageOfCertificationByWithdrawnAuthorIsNotFound() {
+        val fixture = fixture()
+        val storage = FakeImageStorage()
+        val storageKey = storage.save(jpegBytes, ImageFormat.JPEG)
+        val certification = persist(Certification(fixture.user, fixture.assignment, storageKey, "인증", Visibility.PUBLIC))
+        entityManager.flush()
+        fixture.user.withdraw()
+        entityManager.flush()
+
+        val exception = assertThrows<BusinessException> {
+            service(storage).getImage(fixture.otherUser.userId!!, certification.certificationId!!)
+        }
+
+        assertEquals(CertificationErrorCode.CERT_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
     fun ownerCanLoadOwnImageBytes() {
         val fixture = fixture()
         val storage = FakeImageStorage()

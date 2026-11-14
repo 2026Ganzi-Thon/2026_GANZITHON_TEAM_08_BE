@@ -11,6 +11,7 @@ import com.ganzithon.team08.domain.cheer.CheerRepository
 import com.ganzithon.team08.domain.mission.MissionAssignmentService
 import com.ganzithon.team08.domain.user.User
 import com.ganzithon.team08.domain.user.UserRepository
+import com.ganzithon.team08.domain.user.UserStatus
 import com.ganzithon.team08.global.exception.BusinessException
 import com.ganzithon.team08.global.exception.CommonErrorCode
 import com.ganzithon.team08.global.storage.ImageFormat
@@ -66,6 +67,7 @@ class CertificationService(
     fun getDetail(viewerId: Long, certificationId: Long): CertificationDetailResponse {
         val viewer = getUser(viewerId)
         val certification = getCertificationOrThrow(certificationId)
+        requireActiveAuthor(certification)
         if (!certification.isVisibleTo(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
         return toDetailResponse(certification, viewer)
     }
@@ -74,6 +76,7 @@ class CertificationService(
     fun getImage(viewerId: Long, certificationId: Long): Pair<ByteArray, ImageFormat> {
         val viewer = getUser(viewerId)
         val certification = getCertificationOrThrow(certificationId)
+        requireActiveAuthor(certification)
         if (!certification.isVisibleTo(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
         val bytes = imageStorage.load(certification.imageStorageKey)
         val format = requireNotNull(ImageFormat.fromExtension(certification.imageStorageKey.substringAfterLast('.')))
@@ -102,6 +105,11 @@ class CertificationService(
 
     private fun getCertificationOrThrow(certificationId: Long): Certification =
         certificationRepository.findById(certificationId).orElseThrow { BusinessException(CertificationErrorCode.CERT_NOT_FOUND) }
+
+    // 탈퇴 MVP 단순화: 실제 삭제 대신 조회에서 숨긴다 — 작성자가 탈퇴했으면 존재하지 않는 것처럼 404.
+    private fun requireActiveAuthor(certification: Certification) {
+        if (certification.user.status != UserStatus.ACTIVE) throw BusinessException(CertificationErrorCode.CERT_NOT_FOUND)
+    }
 
     private fun getUser(userId: Long): User =
         userRepository.findById(userId).orElseThrow { BusinessException(CommonErrorCode.NOT_FOUND) }
