@@ -7,7 +7,6 @@ spring:
     properties:
       hibernate.hbm2ddl.halt_on_error: true
 
-<<<<<<< HEAD
 app:
   image:
     storage-dir: build/test-images
