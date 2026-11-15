@@ -102,6 +102,10 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
             .joinToString("") { "%02x".format(it) }
     }
 
+    fun clearRefreshTokenHash() {
+        refreshTokenHash = null
+    }
+
     private fun applyType(lifeStage: LifeStage, userType: UserType, carePreference: AnswerChoice, group: CareGroup) {
         check(status == UserStatus.ACTIVE) { "탈퇴한 사용자는 유형을 변경할 수 없습니다." }
         require(group.lifeStage == lifeStage && group.userType.typeCode == userType.typeCode) {
