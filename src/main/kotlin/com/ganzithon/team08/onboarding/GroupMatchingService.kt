@@ -8,4 +8,6 @@ import com.ganzithon.team08.domain.user.UserType
 /** 온보딩에서 그룹 매칭 담당 기능을 호출하기 위한 계약이다. */
 interface GroupMatchingService {
     fun match(user: User, lifeStage: LifeStage, userType: UserType): CareGroup
+
+    fun rematch(user: User, lifeStage: LifeStage, userType: UserType): CareGroup
 }

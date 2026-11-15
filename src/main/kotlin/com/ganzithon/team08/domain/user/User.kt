@@ -90,6 +90,11 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
         applyType(lifeStage, userType, carePreference, group)
     }
 
+    fun updateType(lifeStage: LifeStage, userType: UserType, carePreference: AnswerChoice) {
+        check(onboardingCompleted) { "온보딩을 먼저 완료해야 합니다." }
+        applyType(lifeStage, userType, carePreference, group)
+    }
+
     fun withdraw() {
         status = UserStatus.WITHDRAWN
         group = null
@@ -114,9 +119,9 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
         refreshTokenHash = null
     }
 
-    private fun applyType(lifeStage: LifeStage, userType: UserType, carePreference: AnswerChoice, group: CareGroup) {
+    private fun applyType(lifeStage: LifeStage, userType: UserType, carePreference: AnswerChoice, group: CareGroup?) {
         check(status == UserStatus.ACTIVE) { "탈퇴한 사용자는 유형을 변경할 수 없습니다." }
-        require(group.lifeStage == lifeStage && group.userType.typeCode == userType.typeCode) {
+        require(group == null || (group.lifeStage == lifeStage && group.userType.typeCode == userType.typeCode)) {
             "그룹의 생활 단계와 유형이 사용자와 일치해야 합니다."
         }
         this.lifeStage = lifeStage

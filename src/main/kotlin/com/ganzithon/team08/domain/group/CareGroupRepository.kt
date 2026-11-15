@@ -18,6 +18,7 @@ interface CareGroupRepository : JpaRepository<CareGroup, Long> {
         select g.groupId from CareGroup g
         left join User u on u.group = g and u.status = :activeStatus
         where g.lifeStage = :lifeStage and g.userType.typeCode = :typeCode
+          and (:excludedGroupId is null or g.groupId <> :excludedGroupId)
         group by g.groupId
         having count(u) < :capacity
         order by g.groupId
@@ -27,6 +28,7 @@ interface CareGroupRepository : JpaRepository<CareGroup, Long> {
         typeCode: String,
         activeStatus: UserStatus,
         capacity: Long,
+        excludedGroupId: Long?,
         page: Pageable,
     ): List<Long>
 

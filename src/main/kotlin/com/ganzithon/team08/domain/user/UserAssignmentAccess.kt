@@ -2,9 +2,13 @@
 package com.ganzithon.team08.domain.user
 
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class UserAssignmentAccess(private val userRepository: UserRepository) {
+    @Transactional(readOnly = true)
+    fun find(userId: Long): User? = userRepository.findById(userId).orElse(null)
+
     fun lock(userId: Long): User? = userRepository.findForUpdate(userId)
 
     fun countActiveGroupMembers(groupId: Long): Long =
