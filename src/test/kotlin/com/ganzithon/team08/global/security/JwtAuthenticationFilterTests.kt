@@ -1,5 +1,6 @@
 package com.ganzithon.team08.global.security
 
+import com.ganzithon.team08.domain.user.UserRepository
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.core.context.SecurityContextHolder
+import org.mockito.Mockito.mock
 import java.util.concurrent.atomic.AtomicBoolean
 
 class JwtAuthenticationFilterTests {
@@ -18,7 +20,7 @@ class JwtAuthenticationFilterTests {
             refreshTokenExpirationSeconds = 1209600,
         ),
     )
-    private val filter = JwtAuthenticationFilter(provider)
+    private val filter = JwtAuthenticationFilter(provider, mock(UserRepository::class.java))
 
     @AfterEach
     fun clearSecurityContext() {
