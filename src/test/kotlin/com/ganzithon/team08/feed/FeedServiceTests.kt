@@ -148,6 +148,43 @@ class FeedServiceTests @Autowired constructor(
     }
 
     @Test
+    fun groupFeedExcludesPublicCertificationFromBeforeAuthorJoinedViewersGroup() {
+        // 회윤님 전달(그룹 이동/탈퇴 정책): PUBLIC도 전체 피드엔 유지되지만, 새 그룹 피드에는
+        // 자동 노출되면 안 된다 — 인증 당시 그룹(c.group)이 조회 그룹과 같아야 포함되어야 한다.
+        val originalGroup = newGroup()
+        val author = newUser(originalGroup, "author")
+        val publicPost = certification(originalGroup, Visibility.PUBLIC, author)
+        entityManager.flush()
+
+        val newGroup = newGroup()
+        val viewer = newUser(newGroup, "viewer")
+        author.updateType(newGroup.lifeStage, newGroup.userType, AnswerChoice.A, newGroup)
+        entityManager.flush()
+
+        val feed = service().getGroupFeed(viewer.userId!!, null, 20)
+
+        assertTrue(feed.items.none { it.certificationId == publicPost.certificationId })
+    }
+
+    @Test
+    fun groupFeedStillShowsPublicCertificationToRemainingOriginalGroupMemberAfterAuthorLeaves() {
+        val originalGroup = newGroup()
+        val author = newUser(originalGroup, "author")
+        val remainingMember = newUser(originalGroup, "remaining")
+        val publicPost = certification(originalGroup, Visibility.PUBLIC, author)
+        entityManager.flush()
+
+        val otherType = persist(UserType("TYPE_${System.nanoTime()}", "유형3", "설명3"))
+        val otherGroup = persist(CareGroup(LifeStage.EARLY_CAREER, otherType))
+        author.updateType(LifeStage.EARLY_CAREER, otherType, AnswerChoice.A, otherGroup)
+        entityManager.flush()
+
+        val feed = service().getGroupFeed(remainingMember.userId!!, null, 20)
+
+        assertTrue(feed.items.any { it.certificationId == publicPost.certificationId })
+    }
+
+    @Test
     fun groupFeedIsEmptyWhenViewerHasNoGroup() {
         val soloUser = persist(User("solo", "혼자양"))
         entityManager.flush()

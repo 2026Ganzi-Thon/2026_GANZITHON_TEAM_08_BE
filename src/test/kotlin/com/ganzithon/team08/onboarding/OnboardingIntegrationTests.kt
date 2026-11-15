@@ -1,12 +1,18 @@
 // 최초 온보딩의 그룹 정원, 미션 배정 및 전체 롤백을 검증한다.
 package com.ganzithon.team08.onboarding
 
+import com.ganzithon.team08.certification.CertificationService
+import com.ganzithon.team08.certification.GroupCertificationPrivacyService
+import com.ganzithon.team08.certification.dto.CertificationRegisterRequest
+import com.ganzithon.team08.domain.certification.Certification
+import com.ganzithon.team08.domain.certification.Visibility
 import com.ganzithon.team08.domain.group.CareGroup
 import com.ganzithon.team08.domain.group.DefaultGroupMatchingService
 import com.ganzithon.team08.domain.group.GroupAssignmentAccess
 import com.ganzithon.team08.domain.mission.Mission
 import com.ganzithon.team08.domain.mission.MissionAllocator
 import com.ganzithon.team08.domain.mission.MissionAssignment
+import com.ganzithon.team08.domain.mission.MissionAssignmentService
 import com.ganzithon.team08.domain.mission.MissionErrorCode
 import com.ganzithon.team08.domain.mission.MissionType
 import com.ganzithon.team08.domain.onboarding.AnswerChoice
@@ -17,6 +23,8 @@ import com.ganzithon.team08.domain.user.UserAssignmentAccess
 import com.ganzithon.team08.domain.user.UserType
 import com.ganzithon.team08.domain.user.UserTypeMatchingAccess
 import com.ganzithon.team08.global.exception.BusinessException
+import com.ganzithon.team08.global.storage.ImageFormat
+import com.ganzithon.team08.global.storage.ImageStorage
 import jakarta.persistence.EntityManager
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,12 +35,16 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.DayOfWeek
@@ -46,12 +58,18 @@ import java.util.concurrent.TimeUnit
 @ActiveProfiles("test")
 @Import(
     OnboardingSubmitService::class, OnboardingTypeCalculator::class, DefaultGroupMatchingService::class,
+    OnboardingRetestService::class, GroupCertificationPrivacyService::class, CertificationService::class,
+    MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
     MissionAllocator::class, UserAssignmentAccess::class, UserTypeMatchingAccess::class, GroupAssignmentAccess::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OnboardingIntegrationTests @Autowired constructor(
     private val entities: EntityManager,
     private val onboarding: OnboardingSubmitService,
+    private val retest: OnboardingRetestService,
+    private val allocator: MissionAllocator,
+    private val certificationService: CertificationService,
+    private val imageStorage: BlockingStorage,
     manager: PlatformTransactionManager,
 ) {
     private val tx = TransactionTemplate(manager)
@@ -62,7 +80,7 @@ class OnboardingIntegrationTests @Autowired constructor(
     fun selectsLowestAvailableMatchingGroupAndReusesItsWeeklyMission() {
         val (userId, groupId, weeklyId) = tx.execute {
             val fixture = seed()
-            val other = persist(UserType("TYPE_02", "다른 유형", "설명"))
+            val other = entities.find(UserType::class.java, "TYPE_02")
             persist(CareGroup(stage, other))
             val group = persist(CareGroup(stage, fixture.type))
             val weekly = persist(MissionAssignment.forGroup(fixture.groupMission!!, group, weekStart()))
@@ -131,6 +149,157 @@ class OnboardingIntegrationTests @Autowired constructor(
         }
     }
 
+    @Test
+    fun preferenceOnlyRetestKeepsCurrentAssignmentAndUsesNewPreferenceNextDay() {
+        val (id, nextMissionId) = tx.execute {
+            val fixture = seed()
+            val next = persist(Mission(
+                MissionType.PERSONAL, "새 선호", "설명", listOf("수행"), "인증 안내",
+                com.ganzithon.team08.domain.mission.MissionPreference.B,
+            ))
+            fixture.users.first() to next.missionId!!
+        }
+        onboarding.submit(id, request)
+        val before = tx.execute { personalAssignmentId(id) }
+        val result = retest.submit(id, withAnswer(3, AnswerChoice.B))
+        assertEquals(AnswerChoice.B, result.carePreference)
+        assertFalse(result.groupRematched)
+        assertNotNull(result.groupId)
+        assertEquals(AnswerChoice.B, retest.getCurrentAnswers(id).answers.single { it.questionId == 3 }.choice)
+        assertEquals(before, tx.execute { personalAssignmentId(id) })
+        assertEquals(2L, tx.execute { count("MissionAssignment") })
+        val nextDay = Instant.now().plusSeconds(86_400)
+        assertEquals(nextMissionId, allocator.ensurePersonalAssignment(id, nextDay).missionId)
+    }
+
+    @Test
+    fun ungroupedUserStaysUngroupedAfterNewType() {
+        val id = tx.execute { seed().users.first() }
+        onboarding.submit(id, request)
+        tx.executeWithoutResult {
+            entities.createQuery("update User u set u.group = null where u.userId = :id")
+                .setParameter("id", id).executeUpdate()
+        }
+        val result = retest.submit(id, changedType())
+        assertEquals("TYPE_02", result.typeCode)
+        assertNull(result.groupId)
+        assertFalse(result.groupRematched)
+        assertEquals(1L, tx.execute { count("CareGroup") })
+        assertEquals(2L, tx.execute { count("MissionAssignment") })
+    }
+
+    @Test
+    fun missingWeeklyCandidateRollsBackGroupTypeAnswersAndCertificationVisibility() {
+        val id = tx.execute { seed().users.first() }
+        onboarding.submit(id, request)
+        val (oldGroupId, certificateId) = tx.execute {
+            val user = entities.find(User::class.java, id)
+            val assignment = entities.find(MissionAssignment::class.java, personalAssignmentId(id))
+            val certificate = persist(Certification(user, assignment, "private/test.jpg", "인증", Visibility.GROUP))
+            // 기존 배정은 보존하면서 신규 후보에서만 제외한다.
+            entities.createQuery("update Mission m set m.description = null where m.missionType = :type")
+                .setParameter("type", MissionType.GROUP).executeUpdate()
+            user.group!!.groupId!! to certificate.certificationId!!
+        }
+        assertEquals(MissionErrorCode.MISSION_POOL_EMPTY, assertThrows<BusinessException> {
+            retest.submit(id, changedType())
+        }.errorCode)
+        assertEquals(AnswerChoice.A, retest.getCurrentAnswers(id).answers.single { it.questionId == 2 }.choice)
+        tx.executeWithoutResult {
+            val user = entities.find(User::class.java, id)
+            assertEquals(oldGroupId, user.group?.groupId)
+            assertEquals("TYPE_01", user.userType?.typeCode)
+            assertEquals(Visibility.GROUP, entities.find(Certification::class.java, certificateId).visibility)
+            assertEquals(1L, count("CareGroup"))
+        }
+    }
+
+    @Test
+    fun certificationFinishesBeforeRetestAndKeepsOriginalGroupSnapshot() {
+        val (id, groupMissionId) = tx.execute {
+            val fixture = seed()
+            fixture.users.first() to fixture.groupMission!!.missionId!!
+        }
+        onboarding.submit(id, request)
+        val oldGroupId = tx.execute { entities.find(User::class.java, id).group!!.groupId!! }
+        val workers = Executors.newFixedThreadPool(2)
+        val retestStarted = CountDownLatch(1)
+        imageStorage.blockNextSave()
+        try {
+            val certification = workers.submit(Callable {
+                certificationService.register(id, groupCertificationRequest(groupMissionId))
+            })
+            check(imageStorage.entered.await(5, TimeUnit.SECONDS))
+            val moving = workers.submit(Callable {
+                retestStarted.countDown()
+                retest.submit(id, changedType())
+            })
+            check(retestStarted.await(5, TimeUnit.SECONDS))
+            org.junit.jupiter.api.assertThrows<java.util.concurrent.TimeoutException> {
+                moving.get(300, TimeUnit.MILLISECONDS)
+            }
+            imageStorage.release.countDown()
+            val saved = certification.get(10, TimeUnit.SECONDS)
+            val moved = moving.get(10, TimeUnit.SECONDS)
+            assertEquals(true, moved.groupRematched)
+            org.junit.jupiter.api.Assertions.assertNotEquals(oldGroupId, moved.groupId)
+            tx.executeWithoutResult {
+                val snapshot = entities.find(Certification::class.java, saved.certificationId)
+                assertEquals(oldGroupId, snapshot.group?.groupId)
+                assertEquals(oldGroupId, snapshot.assignment.group?.groupId)
+                assertEquals(Visibility.PRIVATE, snapshot.visibility)
+                assertEquals(3L, count("MissionAssignment"))
+            }
+            assertEquals("CERT_ALREADY_EXISTS", assertThrows<BusinessException> {
+                certificationService.register(id, groupCertificationRequest(groupMissionId))
+            }.errorCode.code)
+        } finally {
+            imageStorage.release.countDown()
+            workers.shutdownNow()
+        }
+    }
+
+    private fun groupCertificationRequest(missionId: Long) = CertificationRegisterRequest(
+        MockMultipartFile("image", "test.jpg", "image/jpeg", byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0)),
+        "그룹 미션 완료", MissionType.GROUP, missionId, Visibility.GROUP,
+    )
+
+    private fun withAnswer(id: Int, choice: AnswerChoice) =
+        request.copy(answers = request.answers.map { if (it.questionId == id) it.copy(choice = choice) else it })
+
+    private fun changedType() = withAnswer(2, AnswerChoice.B)
+
+    private fun personalAssignmentId(userId: Long): Long =
+        entities.createQuery(
+            "select a.assignmentId from MissionAssignment a where a.user.userId = :id",
+            Long::class.javaObjectType,
+        ).setParameter("id", userId).singleResult
+
+    @TestConfiguration
+    class StorageConfig {
+        @Bean
+        fun imageStorage() = BlockingStorage()
+    }
+
+    class BlockingStorage : ImageStorage {
+        var entered = CountDownLatch(0)
+        var release = CountDownLatch(0)
+
+        fun blockNextSave() {
+            entered = CountDownLatch(1)
+            release = CountDownLatch(1)
+        }
+
+        override fun save(content: ByteArray, format: ImageFormat): String {
+            entered.countDown()
+            check(release.await(10, TimeUnit.SECONDS))
+            return "images/test.jpg"
+        }
+
+        override fun load(storageKey: String): ByteArray = error("사진 조회는 이 테스트의 범위 밖입니다.")
+        override fun delete(storageKey: String) = Unit
+    }
+
     private fun submitConcurrently(ids: List<Long>): List<String> {
         val workers = Executors.newFixedThreadPool(ids.size)
         val ready = CountDownLatch(ids.size)
@@ -164,6 +333,7 @@ class OnboardingIntegrationTests @Autowired constructor(
 
     private fun seed(withGroupMission: Boolean = true): Fixture {
         val type = persist(UserType("TYPE_01", "기본 유형", "설명"))
+        persist(UserType("TYPE_02", "변경 유형", "설명"))
         (1..4).forEach { persist(OnboardingQuestion(it, "질문", "선택 A", "선택 B")) }
         val users = (1..2).map { persist(User("onboarding-$it", "신규 사용자")).userId!! }
         persist(Mission(MissionType.PERSONAL, "개인 미션", "설명", listOf("수행"), "인증 안내"))
@@ -175,6 +345,7 @@ class OnboardingIntegrationTests @Autowired constructor(
 
     @AfterEach
     fun removeFixtures() = tx.executeWithoutResult {
+        entities.createQuery("delete from Certification").executeUpdate()
         entities.createQuery("delete from OnboardingAnswer").executeUpdate()
         entities.createQuery("delete from MissionAssignment").executeUpdate()
         entities.createQuery("select m from Mission m", Mission::class.java).resultList.forEach(entities::remove)
