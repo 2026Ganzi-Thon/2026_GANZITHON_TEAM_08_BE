@@ -42,7 +42,7 @@ class SecurityConfig(
             }
             .authorizeHttpRequests { requests ->
                 requests
-                    .requestMatchers("/actuator/health", "/api/auth/kakao", "/api/auth/kakao/callback").permitAll()
+                    .requestMatchers("/actuator/health", "/api/auth/kakao", "/api/auth/kakao/callback", "/api/auth/refresh").permitAll()
                     .anyRequest().authenticated()
             }
             .addFilterBefore(JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter::class.java)
