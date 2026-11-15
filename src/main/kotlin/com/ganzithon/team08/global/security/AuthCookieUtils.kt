@@ -11,6 +11,15 @@ class AuthCookieUtils {
 
     fun refreshToken(value: String): ResponseCookie = tokenCookie("REFRESH_TOKEN", value, 1209600)
 
+    fun csrfToken(value: String): ResponseCookie =
+        ResponseCookie.from("XSRF-TOKEN", value)
+            .httpOnly(false)
+            .secure(true)
+            .sameSite("Lax")
+            .path("/")
+            .maxAge(3600)
+            .build()
+
     fun expire(name: String): ResponseCookie = tokenCookie(name, "", 0)
 
     fun tokenCookie(name: String, value: String, maxAge: Long): ResponseCookie =
