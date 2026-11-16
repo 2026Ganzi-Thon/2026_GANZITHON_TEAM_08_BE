@@ -397,6 +397,60 @@ class OnboardingIntegrationTests @Autowired constructor(
         }
     }
 
+    @Test
+    fun rejoinsDifferentGroupAndKeepsWeeklyCertificationLimit() {
+        val (id, missionId) = tx.execute {
+            val fixture = seed()
+            fixture.users.first() to fixture.groupMission!!.missionId!!
+        }
+        onboarding.submit(id, request)
+        val old = checkNotNull(myGroup.getMyGroup(id).groupId)
+        certificationService.register(id, groupCertificationRequest(missionId))
+        myGroup.leaveGroup(id, old)
+
+        val joined = myGroup.match(id)
+        org.junit.jupiter.api.Assertions.assertNotEquals(old, joined.groupId)
+        assertEquals(true, joined.groupCreated)
+        assertEquals(1L, joined.memberCount)
+        assertEquals(MyGroupErrorCode.GROUP_ALREADY_JOINED, assertThrows<BusinessException> {
+            myGroup.match(id)
+        }.errorCode)
+        assertEquals("CERT_ALREADY_EXISTS", assertThrows<BusinessException> {
+            certificationService.register(id, groupCertificationRequest(missionId))
+        }.errorCode.code)
+    }
+
+    @Test
+    fun manualRematchRejectsReplayAndRollsBackWhenNewGroupHasNoMission() {
+        val id = tx.execute { seed().users.first() }
+        onboarding.submit(id, request)
+        val old = checkNotNull(myGroup.getMyGroup(id).groupId)
+        val moved = myGroup.rematch(id, old)
+        assertEquals(true, moved.groupRematched)
+        assertEquals(old, moved.previousGroupId)
+        assertEquals(MyGroupErrorCode.GROUP_CHANGED, assertThrows<BusinessException> {
+            myGroup.rematch(id, old)
+        }.errorCode)
+
+        // 현재 그룹만 후보가 되게 하고 주간 미션 후보를 제거한다.
+        tx.executeWithoutResult {
+            val user = entities.find(User::class.java, id)
+            val group = checkNotNull(user.group)
+            repeat(4) { index ->
+                persist(User("match-rollback-$index", "그룹원")).completeOnboarding(
+                    group.lifeStage, group.userType, AnswerChoice.A, entities.find(CareGroup::class.java, old),
+                )
+            }
+            entities.createQuery("update Mission m set m.description = null where m.missionType = :type")
+                .setParameter("type", MissionType.GROUP).executeUpdate()
+        }
+        assertEquals(MissionErrorCode.MISSION_POOL_EMPTY, assertThrows<BusinessException> {
+            myGroup.rematch(id, moved.groupId)
+        }.errorCode)
+        assertEquals(moved.groupId, myGroup.getMyGroup(id).groupId)
+        assertEquals(2L, tx.execute { count("CareGroup") })
+    }
+
     private fun groupCertificationRequest(missionId: Long) = CertificationRegisterRequest(
         MockMultipartFile("image", "test.jpg", "image/jpeg", byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0)),
         "그룹 미션 완료", MissionType.GROUP, missionId, Visibility.GROUP,

@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -26,13 +27,25 @@ class MyGroupController(private val groups: MyGroupService) {
     @DeleteMapping
     fun leaveGroup(
         authentication: Authentication,
-        @Valid @RequestBody(required = false) request: LeaveGroupRequest?,
-    ): LeaveGroupResponse {
+        @Valid @RequestBody(required = false) request: ExpectedGroupRequest?,
+    ): LeaveGroupResponse = groups.leaveGroup(authentication.name.toLong(), expectedGroupId(request))
+
+    @PostMapping("/match")
+    fun match(authentication: Authentication): GroupMatchResponse =
+        groups.match(authentication.name.toLong())
+
+    @PostMapping("/rematch")
+    fun rematch(
+        authentication: Authentication,
+        @Valid @RequestBody(required = false) request: ExpectedGroupRequest?,
+    ): GroupMatchResponse = groups.rematch(authentication.name.toLong(), expectedGroupId(request))
+
+    private fun expectedGroupId(request: ExpectedGroupRequest?): Long {
         val id = request?.expectedGroupId
         if (id == null || !id.isIntegralNumber || !id.canConvertToLong() || id.asLong() <= 0) {
             throw BusinessException(MyGroupErrorCode.INVALID_GROUP_ID)
         }
-        return groups.leaveGroup(authentication.name.toLong(), id.asLong())
+        return id.asLong()
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
@@ -40,4 +53,4 @@ class MyGroupController(private val groups: MyGroupService) {
         ResponseEntity.badRequest().body(ErrorResponse.from(MyGroupErrorCode.INVALID_GROUP_ID))
 }
 
-data class LeaveGroupRequest(@field:NotNull val expectedGroupId: JsonNode? = null)
+data class ExpectedGroupRequest(@field:NotNull val expectedGroupId: JsonNode? = null)
