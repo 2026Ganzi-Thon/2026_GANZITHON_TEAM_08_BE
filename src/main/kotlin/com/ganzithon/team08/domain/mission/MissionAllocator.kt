@@ -21,7 +21,11 @@ class MissionAllocator(
     private val users: UserAssignmentAccess,
     private val groups: GroupAssignmentAccess,
 ) {
-    fun ensurePersonalAssignment(userId: Long, referenceTime: Instant): AssignmentResult {
+    fun ensurePersonalAssignment(
+        userId: Long,
+        referenceTime: Instant,
+        currentTime: (() -> Instant)? = null,
+    ): AssignmentResult {
         val user = users.lock(userId) ?: throw BusinessException(MissionErrorCode.TARGET_INELIGIBLE)
         if (user.status != UserStatus.ACTIVE || !user.onboardingCompleted) {
             throw BusinessException(MissionErrorCode.TARGET_INELIGIBLE)
@@ -41,10 +45,15 @@ class MissionAllocator(
         }
         val previousId = assignments.findByUser_UserIdAndMissionDate(userId, date.minusDays(1))?.mission?.missionId
         val mission = choose(candidates, previousId)
+        if (currentTime != null && MissionPeriod.dateAt(currentTime()) != date) periodEnded()
         return AssignmentResult.from(assignments.save(MissionAssignment.forUser(mission, user, date)), created = true)
     }
 
-    fun ensureGroupAssignment(groupId: Long, referenceTime: Instant): AssignmentResult {
+    fun ensureGroupAssignment(
+        groupId: Long,
+        referenceTime: Instant,
+        currentTime: (() -> Instant)? = null,
+    ): AssignmentResult {
         val group = groups.lock(groupId) ?: throw BusinessException(MissionErrorCode.TARGET_INELIGIBLE)
         if (!users.hasActiveGroupMember(groupId)) throw BusinessException(MissionErrorCode.TARGET_INELIGIBLE)
 
@@ -54,8 +63,11 @@ class MissionAllocator(
         val candidates = missions.findAssignmentCandidates(MissionType.GROUP)
         val previousId = assignments.findByGroup_GroupIdAndMissionDate(groupId, week.minusWeeks(1))?.mission?.missionId
         val mission = choose(candidates, previousId)
+        if (currentTime != null && MissionPeriod.weekStart(MissionPeriod.dateAt(currentTime())) != week) periodEnded()
         return AssignmentResult.from(assignments.save(MissionAssignment.forGroup(mission, group, week)), created = true)
     }
+
+    private fun periodEnded(): Nothing = throw BusinessException(MissionErrorCode.ASSIGNMENT_PERIOD_ENDED)
 
     private fun choose(candidates: List<Mission>, previousId: Long?): Mission {
         if (candidates.isEmpty()) throw BusinessException(MissionErrorCode.MISSION_POOL_EMPTY)

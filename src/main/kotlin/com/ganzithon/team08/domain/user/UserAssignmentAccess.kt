@@ -1,6 +1,8 @@
 // 배정 트랜잭션에서 사용자 잠금과 활성 그룹원 확인을 제공한다.
 package com.ganzithon.team08.domain.user
 
+import org.springframework.data.domain.PageRequest
+import java.time.LocalDate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -14,6 +16,10 @@ class UserAssignmentAccess(private val userRepository: UserRepository) {
     @Transactional(readOnly = true)
     fun findActiveGroupMembers(groupId: Long): List<User> =
         userRepository.findAllByGroup_GroupIdAndStatusOrderByUserIdAsc(groupId, UserStatus.ACTIVE)
+
+    @Transactional(readOnly = true)
+    fun findMissingPersonalAssignmentIds(afterId: Long, date: LocalDate, limit: Int): List<Long> =
+        userRepository.findMissingPersonalAssignmentIds(afterId, UserStatus.ACTIVE, date, PageRequest.ofSize(limit))
 
     fun countActiveGroupMembers(groupId: Long): Long =
         userRepository.countByGroup_GroupIdAndStatus(groupId, UserStatus.ACTIVE)
