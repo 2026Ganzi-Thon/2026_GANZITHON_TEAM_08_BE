@@ -4,6 +4,8 @@ package com.ganzithon.team08.onboarding
 import com.ganzithon.team08.certification.CertificationService
 import com.ganzithon.team08.certification.MissionCertificationQueries
 import com.ganzithon.team08.mission.CurrentMissionService
+import com.ganzithon.team08.mission.MissionRefreshJobs
+import com.ganzithon.team08.mission.MissionRefreshKind
 import com.ganzithon.team08.feed.FeedService
 import com.ganzithon.team08.certification.GroupCertificationPrivacyService
 import com.ganzithon.team08.certification.dto.CertificationRegisterRequest
@@ -67,7 +69,7 @@ import java.util.concurrent.TimeUnit
 @Import(
     OnboardingSubmitService::class, OnboardingTypeCalculator::class, DefaultGroupMatchingService::class,
     OnboardingRetestService::class, GroupCertificationPrivacyService::class, CertificationService::class,
-    MyGroupService::class, FeedService::class, CurrentMissionService::class, MissionCertificationQueries::class, MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
+    MissionRefreshJobs::class, MyGroupService::class, FeedService::class, CurrentMissionService::class, MissionCertificationQueries::class, MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
     MissionAllocator::class, UserAssignmentAccess::class, UserTypeMatchingAccess::class, GroupAssignmentAccess::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -78,6 +80,7 @@ class OnboardingIntegrationTests @Autowired constructor(
     private val allocator: MissionAllocator,
     private val myGroup: MyGroupService,
     private val currentMissions: CurrentMissionService,
+    private val refreshJobs: MissionRefreshJobs,
     private val feed: FeedService,
     private val certificationService: CertificationService,
     private val imageStorage: BlockingStorage,
@@ -496,6 +499,45 @@ class OnboardingIntegrationTests @Autowired constructor(
         assertEquals(MyGroupErrorCode.GROUP_NOT_FOUND, assertThrows<BusinessException> {
             currentMissions.group(id)
         }.errorCode)
+    }
+
+    @Test
+    fun missionRefreshSkipsIneligibleTargetsAndRepairsOnlyMissingCurrentAssignments() {
+        val reference = Instant.parse("2030-11-17T15:00:00Z")
+        val (id, groupId) = tx.execute {
+            val fixture = seed(withGroupMission = false)
+            val empty = persist(CareGroup(stage, fixture.type))
+            val active = persist(CareGroup(stage, fixture.type))
+            val user = entities.find(User::class.java, fixture.users.first())
+            user.completeOnboarding(stage, fixture.type, AnswerChoice.A, active)
+            check(empty.groupId != active.groupId)
+            fixture.users.first() to active.groupId!!
+        }
+        assertEquals(1, refreshJobs.run(MissionRefreshKind.PERSONAL, reference) { reference }.created)
+        assertEquals(1, refreshJobs.run(MissionRefreshKind.GROUP, reference) { reference }.failed)
+        val previousPersonal = currentMissions.personal(id, reference).mission.assignmentId
+        tx.executeWithoutResult {
+            persist(Mission(MissionType.GROUP, "복구 그룹 미션", "설명", listOf("수행"), "안내"))
+        }
+        assertEquals(1, refreshJobs.run(MissionRefreshKind.GROUP, reference) { reference }.created)
+        assertEquals(0, refreshJobs.run(MissionRefreshKind.GROUP, reference) { reference }.created)
+        assertEquals(0, refreshJobs.run(MissionRefreshKind.PERSONAL, reference) { reference }.created)
+        assertEquals(previousPersonal, currentMissions.personal(id, reference).mission.assignmentId)
+        assertEquals(groupId, currentMissions.group(id, reference).groupId)
+        assertEquals(2L, tx.execute { count("MissionAssignment") })
+    }
+
+    @Test
+    fun scheduledAssignmentRejectsExpiredPeriodBeforeSaving() {
+        val id = tx.execute { seed().users.first() }
+        onboarding.submit(id, request)
+        val reference = Instant.parse("2030-11-17T14:59:59Z")
+        val now = reference.plusSeconds(1)
+        assertEquals(MissionErrorCode.ASSIGNMENT_PERIOD_ENDED, assertThrows<BusinessException> {
+            allocator.ensurePersonalAssignment(id, reference) { now }
+        }.errorCode)
+        assertEquals(0, refreshJobs.run(MissionRefreshKind.GROUP, reference) { now }.created)
+        assertEquals(2L, tx.execute { count("MissionAssignment") })
     }
 
     private fun groupCertificationRequest(missionId: Long) = CertificationRegisterRequest(

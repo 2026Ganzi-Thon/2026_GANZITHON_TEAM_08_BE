@@ -7,6 +7,7 @@ import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.domain.Pageable
+import java.time.LocalDate
 import org.springframework.data.jpa.repository.Query
 
 interface CareGroupRepository : JpaRepository<CareGroup, Long> {
@@ -31,6 +32,17 @@ interface CareGroupRepository : JpaRepository<CareGroup, Long> {
         excludedGroupId: Long?,
         page: Pageable,
     ): List<Long>
+
+    @Query("""
+        select g.groupId from CareGroup g
+        where g.groupId > :afterId
+          and exists (select u.userId from User u where u.group = g and u.status = :status)
+          and not exists (
+            select a.assignmentId from MissionAssignment a where a.group = g and a.missionDate = :week
+          )
+        order by g.groupId
+    """)
+    fun findMissingWeeklyAssignmentIds(afterId: Long, status: UserStatus, week: LocalDate, page: Pageable): List<Long>
 
     fun findAllByLifeStageAndUserType_TypeCodeOrderByGroupIdAsc(
         lifeStage: LifeStage,
