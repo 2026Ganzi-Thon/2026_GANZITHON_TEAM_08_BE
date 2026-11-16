@@ -2,6 +2,8 @@
 package com.ganzithon.team08.group
 
 import com.ganzithon.team08.domain.group.CareGroup
+import com.ganzithon.team08.domain.mission.Mission
+import com.ganzithon.team08.domain.mission.MissionType
 import com.ganzithon.team08.domain.onboarding.AnswerChoice
 import com.ganzithon.team08.domain.user.LifeStage
 import com.ganzithon.team08.domain.user.User
@@ -97,6 +99,27 @@ class MyGroupApiTests @Autowired constructor(
         mvc.perform(leave(user, """{"expectedGroupId":${group.groupId!! + 1}}"""))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("GROUP_CHANGED"))
+    }
+
+    @Test
+    fun missionViewsReturnFlatMissionDetailsAndGroupParticipation() {
+        val (user, group) = fixture()
+        persist(Mission(MissionType.PERSONAL, "개인", "안내", listOf("첫째"), "사진"))
+        persist(Mission(MissionType.GROUP, "그룹", "안내", listOf("첫째"), "사진"))
+        mvc.perform(get("/api/missions/personal/today").cookie(auth(user)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.assignmentId").isNumber)
+            .andExpect(jsonPath("$.missionType").value("PERSONAL"))
+            .andExpect(jsonPath("$.steps[0]").value("첫째"))
+            .andExpect(jsonPath("$.startsAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
+            .andExpect(jsonPath("$.completed").value(false))
+        mvc.perform(get("/api/groups/me/missions/current").cookie(auth(user)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.missionType").value("GROUP"))
+            .andExpect(jsonPath("$.groupId").value(group.groupId))
+            .andExpect(jsonPath("$.memberCount").value(1))
+            .andExpect(jsonPath("$.members[0].isMe").value(true))
+            .andExpect(jsonPath("$.canCertify").value(true))
     }
 
     private fun fixture(): Pair<User, CareGroup> {
