@@ -11,6 +11,8 @@ interface UserRepository : JpaRepository<User, Long> {
     @Query("select target from User target where target.userId = :id")
     fun findForUpdate(id: Long): User?
 
+    fun findAllByGroup_GroupIdAndStatusOrderByUserIdAsc(groupId: Long, status: UserStatus): List<User>
+
     fun countByGroup_GroupIdAndStatus(groupId: Long, status: UserStatus): Long
 
     fun existsByGroup_GroupIdAndStatus(groupId: Long, status: UserStatus): Boolean
