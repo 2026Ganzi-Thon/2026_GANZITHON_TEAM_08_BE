@@ -99,6 +99,21 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
         applyType(lifeStage, userType, carePreference, group)
     }
 
+    fun joinGroup(target: CareGroup) {
+        check(status == UserStatus.ACTIVE && onboardingCompleted && group == null)
+        require(target.lifeStage == lifeStage && target.userType.typeCode == userType?.typeCode)
+        group = target
+    }
+
+    fun moveGroup(target: CareGroup) {
+        check(status == UserStatus.ACTIVE && onboardingCompleted)
+        val currentId = checkNotNull(group?.groupId)
+        require(currentId != target.groupId)
+        require(target.lifeStage == lifeStage && target.userType.typeCode == userType?.typeCode)
+        previousGroupId = currentId
+        group = target
+    }
+
     fun leaveGroup() {
         previousGroupId = checkNotNull(group?.groupId)
         group = null

@@ -40,3 +40,13 @@ data class MyGroupResponse(
 data class MyGroupMember(val userId: Long, val nickname: String, val isMe: Boolean)
 
 data class LeaveGroupResponse(val leftGroupId: Long, val groupId: Long? = null, val left: Boolean = true)
+
+data class GroupMatchResponse(
+    val groupId: Long,
+    val lifeStage: LifeStage,
+    val typeCode: String,
+    val groupCreated: Boolean,
+    val memberCount: Long,
+    val previousGroupId: Long? = null,
+    val groupRematched: Boolean = false,
+)
