@@ -2,6 +2,7 @@
 package com.ganzithon.team08.onboarding
 
 import com.ganzithon.team08.certification.CertificationService
+import com.ganzithon.team08.feed.FeedService
 import com.ganzithon.team08.certification.GroupCertificationPrivacyService
 import com.ganzithon.team08.certification.dto.CertificationRegisterRequest
 import com.ganzithon.team08.domain.certification.Certification
@@ -25,7 +26,12 @@ import com.ganzithon.team08.domain.user.UserTypeMatchingAccess
 import com.ganzithon.team08.global.exception.BusinessException
 import com.ganzithon.team08.global.storage.ImageFormat
 import com.ganzithon.team08.global.storage.ImageStorage
+import com.ganzithon.team08.group.MyGroupErrorCode
+import com.ganzithon.team08.group.MyGroupService
 import jakarta.persistence.EntityManager
+import org.mockito.Mockito.doThrow
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+import org.springframework.test.util.AopTestUtils
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -59,7 +65,7 @@ import java.util.concurrent.TimeUnit
 @Import(
     OnboardingSubmitService::class, OnboardingTypeCalculator::class, DefaultGroupMatchingService::class,
     OnboardingRetestService::class, GroupCertificationPrivacyService::class, CertificationService::class,
-    MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
+    MyGroupService::class, FeedService::class, MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
     MissionAllocator::class, UserAssignmentAccess::class, UserTypeMatchingAccess::class, GroupAssignmentAccess::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -68,10 +74,15 @@ class OnboardingIntegrationTests @Autowired constructor(
     private val onboarding: OnboardingSubmitService,
     private val retest: OnboardingRetestService,
     private val allocator: MissionAllocator,
+    private val myGroup: MyGroupService,
+    private val feed: FeedService,
     private val certificationService: CertificationService,
     private val imageStorage: BlockingStorage,
     manager: PlatformTransactionManager,
 ) {
+    @MockitoSpyBean
+    private lateinit var privacy: GroupCertificationPrivacyService
+
     private val tx = TransactionTemplate(manager)
     private val stage = LifeStage.JOB_SEEKER
     private val request = OnboardingSubmitRequest(stage, (1..4).map { AnswerRequest(it, AnswerChoice.A) })
@@ -256,6 +267,133 @@ class OnboardingIntegrationTests @Autowired constructor(
         } finally {
             imageStorage.release.countDown()
             workers.shutdownNow()
+        }
+    }
+
+    @Test
+    fun groupLeavePrivatizesConcurrentCertificationAndPreservesHistory() {
+        val (id, groupMissionId) = tx.execute {
+            val fixture = seed()
+            fixture.users.first() to fixture.groupMission!!.missionId!!
+        }
+        onboarding.submit(id, request)
+        val groupId = tx.execute { entities.find(User::class.java, id).group!!.groupId!! }
+        val personalId = tx.execute { personalAssignmentId(id) }
+        val publicId = tx.execute {
+            val user = entities.find(User::class.java, id)
+            val assignment = entities.find(MissionAssignment::class.java, personalId)
+            persist(Certification(user, assignment, "images/public.jpg", "공개 인증", Visibility.PUBLIC)).certificationId!!
+        }
+        val workers = Executors.newFixedThreadPool(2)
+        val leaveStarted = CountDownLatch(1)
+        imageStorage.blockNextSave()
+        try {
+            val certification = workers.submit(Callable {
+                certificationService.register(id, groupCertificationRequest(groupMissionId))
+            })
+            check(imageStorage.entered.await(5, TimeUnit.SECONDS))
+            val leaving = workers.submit(Callable {
+                leaveStarted.countDown()
+                myGroup.leaveGroup(id, groupId)
+            })
+            check(leaveStarted.await(5, TimeUnit.SECONDS))
+            assertThrows<java.util.concurrent.TimeoutException> { leaving.get(300, TimeUnit.MILLISECONDS) }
+            imageStorage.release.countDown()
+            val saved = certification.get(10, TimeUnit.SECONDS)
+            assertEquals(groupId, leaving.get(10, TimeUnit.SECONDS).leftGroupId)
+            assertNull(myGroup.getMyGroup(id).groupId)
+            assertNull(retest.submit(id, changedType()).groupId)
+            tx.executeWithoutResult {
+                val user = entities.find(User::class.java, id)
+                val snapshot = entities.find(Certification::class.java, saved.certificationId)
+                assertEquals(groupId, user.previousGroupId)
+                assertEquals(groupId, snapshot.group?.groupId)
+                assertEquals(groupId, snapshot.assignment.group?.groupId)
+                assertEquals(Visibility.PRIVATE, snapshot.visibility)
+                assertEquals(Visibility.PUBLIC, entities.find(Certification::class.java, publicId).visibility)
+                assertEquals(personalId, personalAssignmentId(id))
+                assertEquals(1L, count("CareGroup"))
+            }
+            assertEquals("MISSION_NOT_ASSIGNED", assertThrows<BusinessException> {
+                certificationService.register(id, groupCertificationRequest(groupMissionId).copy(visibility = Visibility.PRIVATE))
+            }.errorCode.code)
+        } finally {
+            imageStorage.release.countDown()
+            workers.shutdownNow()
+        }
+    }
+
+    @Test
+    fun formerMemberLosesAccessToGroupFeedDetailAndImage() {
+        val (former, author) = tx.execute { seed().users }
+        onboarding.submit(former, request)
+        onboarding.submit(author, request)
+        val groupId = checkNotNull(myGroup.getMyGroup(former).groupId)
+        val certificationId = tx.execute {
+            val user = entities.find(User::class.java, author)
+            val assignment = entities.find(MissionAssignment::class.java, personalAssignmentId(author))
+            persist(Certification(user, assignment, "images/group.jpg", "그룹 인증", Visibility.GROUP)).certificationId!!
+        }
+        assertEquals("/api/images/$certificationId", certificationService.getDetail(former, certificationId).imageUrl)
+        assertEquals(1, feed.getGroupFeed(former, null, 20).items.size)
+
+        myGroup.leaveGroup(former, groupId)
+
+        assertEquals(0, feed.getGroupFeed(former, null, 20).items.size)
+        assertEquals("CERT_FORBIDDEN", assertThrows<BusinessException> {
+            certificationService.getDetail(former, certificationId)
+        }.errorCode.code)
+        assertEquals("CERT_FORBIDDEN", assertThrows<BusinessException> {
+            certificationService.getImage(former, certificationId)
+        }.errorCode.code)
+    }
+
+    @Test
+    fun leaveForOldGroupIsRejectedAfterConcurrentRematchCommits() {
+        val id = tx.execute { seed().users.first() }
+        onboarding.submit(id, request)
+        val oldGroupId = checkNotNull(myGroup.getMyGroup(id).groupId)
+        val workers = Executors.newFixedThreadPool(2)
+        val moved = CountDownLatch(1)
+        val commit = CountDownLatch(1)
+        val leaveStarted = CountDownLatch(1)
+        try {
+            val rematch = workers.submit(Callable {
+                tx.execute {
+                    val result = retest.submit(id, changedType())
+                    moved.countDown()
+                    check(commit.await(5, TimeUnit.SECONDS))
+                    result
+                }
+            })
+            check(moved.await(5, TimeUnit.SECONDS))
+            val leaving = workers.submit(Callable {
+                leaveStarted.countDown()
+                assertThrows<BusinessException> { myGroup.leaveGroup(id, oldGroupId) }.errorCode
+            })
+            check(leaveStarted.await(5, TimeUnit.SECONDS))
+            assertThrows<java.util.concurrent.TimeoutException> { leaving.get(300, TimeUnit.MILLISECONDS) }
+            commit.countDown()
+            assertEquals(MyGroupErrorCode.GROUP_CHANGED, leaving.get(10, TimeUnit.SECONDS))
+            assertEquals(rematch.get(10, TimeUnit.SECONDS).groupId, myGroup.getMyGroup(id).groupId)
+        } finally {
+            commit.countDown()
+            workers.shutdownNow()
+        }
+    }
+
+    @Test
+    fun leaveRollsBackMembershipWhenPrivacyUpdateFails() {
+        val id = tx.execute { seed().users.first() }
+        onboarding.submit(id, request)
+        val groupId = checkNotNull(myGroup.getMyGroup(id).groupId)
+        val target = AopTestUtils.getUltimateTargetObject<GroupCertificationPrivacyService>(privacy)
+        doThrow(IllegalStateException("공개 범위 저장 실패")).`when`(target).makeGroupCertificationsPrivate(id)
+        assertThrows<IllegalStateException> { myGroup.leaveGroup(id, groupId) }
+        tx.executeWithoutResult {
+            val user = entities.find(User::class.java, id)
+            assertEquals(groupId, user.group?.groupId)
+            assertNull(user.previousGroupId)
         }
     }
 

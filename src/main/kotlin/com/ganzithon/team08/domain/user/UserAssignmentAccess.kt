@@ -11,6 +11,10 @@ class UserAssignmentAccess(private val userRepository: UserRepository) {
 
     fun lock(userId: Long): User? = userRepository.findForUpdate(userId)
 
+    @Transactional(readOnly = true)
+    fun findActiveGroupMembers(groupId: Long): List<User> =
+        userRepository.findAllByGroup_GroupIdAndStatusOrderByUserIdAsc(groupId, UserStatus.ACTIVE)
+
     fun countActiveGroupMembers(groupId: Long): Long =
         userRepository.countByGroup_GroupIdAndStatus(groupId, UserStatus.ACTIVE)
 

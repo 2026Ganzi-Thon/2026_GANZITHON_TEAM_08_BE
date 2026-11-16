@@ -70,6 +70,10 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
     var group: CareGroup? = null
         protected set
 
+    @field:Column(name = "previous_group_id")
+    var previousGroupId: Long? = null
+        protected set
+
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false, length = 20)
     var status: UserStatus = UserStatus.ACTIVE
@@ -93,6 +97,11 @@ class User(kakaoUserId: String, nickname: String) : BaseTimeEntity() {
     fun updateType(lifeStage: LifeStage, userType: UserType, carePreference: AnswerChoice) {
         check(onboardingCompleted) { "온보딩을 먼저 완료해야 합니다." }
         applyType(lifeStage, userType, carePreference, group)
+    }
+
+    fun leaveGroup() {
+        previousGroupId = checkNotNull(group?.groupId)
+        group = null
     }
 
     fun withdraw() {

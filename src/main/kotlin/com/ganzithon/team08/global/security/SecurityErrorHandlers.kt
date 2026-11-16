@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.access.AccessDeniedHandler
 import org.springframework.security.web.csrf.InvalidCsrfTokenException
+import org.springframework.security.web.csrf.MissingCsrfTokenException
 import org.springframework.stereotype.Component
 
 @Component
@@ -23,7 +24,8 @@ class JwtAuthenticationEntryPoint : AuthenticationEntryPoint {
 @Component
 class JwtAccessDeniedHandler : AccessDeniedHandler {
     override fun handle(request: HttpServletRequest, response: HttpServletResponse, accessDeniedException: AccessDeniedException) {
-        val csrfFailure = accessDeniedException is InvalidCsrfTokenException
+        val csrfFailure = accessDeniedException is InvalidCsrfTokenException ||
+            accessDeniedException is MissingCsrfTokenException
         SecurityErrorResponseWriter.write(
             response,
             HttpServletResponse.SC_FORBIDDEN,
