@@ -2,6 +2,8 @@
 package com.ganzithon.team08.onboarding
 
 import com.ganzithon.team08.certification.CertificationService
+import com.ganzithon.team08.certification.MissionCertificationQueries
+import com.ganzithon.team08.mission.CurrentMissionService
 import com.ganzithon.team08.feed.FeedService
 import com.ganzithon.team08.certification.GroupCertificationPrivacyService
 import com.ganzithon.team08.certification.dto.CertificationRegisterRequest
@@ -65,7 +67,7 @@ import java.util.concurrent.TimeUnit
 @Import(
     OnboardingSubmitService::class, OnboardingTypeCalculator::class, DefaultGroupMatchingService::class,
     OnboardingRetestService::class, GroupCertificationPrivacyService::class, CertificationService::class,
-    MyGroupService::class, FeedService::class, MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
+    MyGroupService::class, FeedService::class, CurrentMissionService::class, MissionCertificationQueries::class, MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
     MissionAllocator::class, UserAssignmentAccess::class, UserTypeMatchingAccess::class, GroupAssignmentAccess::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -75,6 +77,7 @@ class OnboardingIntegrationTests @Autowired constructor(
     private val retest: OnboardingRetestService,
     private val allocator: MissionAllocator,
     private val myGroup: MyGroupService,
+    private val currentMissions: CurrentMissionService,
     private val feed: FeedService,
     private val certificationService: CertificationService,
     private val imageStorage: BlockingStorage,
@@ -449,6 +452,50 @@ class OnboardingIntegrationTests @Autowired constructor(
         }.errorCode)
         assertEquals(moved.groupId, myGroup.getMyGroup(id).groupId)
         assertEquals(2L, tx.execute { count("CareGroup") })
+    }
+
+    @Test
+    fun weeklyStatusFollowsUserButParticipationFollowsAssignmentAndGroup() {
+        val (viewer, member, missionId) = tx.execute {
+            val fixture = seed()
+            Triple(fixture.users.first(), fixture.users.last(), fixture.groupMission!!.missionId!!)
+        }
+        onboarding.submit(viewer, request)
+        onboarding.submit(member, request)
+        val original = currentMissions.group(viewer)
+        assertEquals(2, original.memberCount)
+        val certification = certificationService.register(
+            viewer, groupCertificationRequest(missionId).copy(visibility = Visibility.PRIVATE),
+        )
+        val completed = currentMissions.group(viewer)
+        assertEquals(true, completed.completedCurrentMission)
+        assertEquals(1, completed.completedMemberCount)
+        assertEquals("50.0", completed.participationRate.toPlainString())
+        myGroup.rematch(viewer, original.groupId)
+        val moved = currentMissions.group(viewer)
+        assertEquals(certification.certificationId, moved.certificationId)
+        assertEquals(true, moved.completedThisWeek)
+        assertFalse(moved.completedCurrentMission)
+        assertFalse(moved.canCertify)
+        assertEquals(0, moved.completedMemberCount)
+        assertEquals(0, currentMissions.group(member).completedMemberCount)
+    }
+
+    @Test
+    fun missingPersonalAssignmentIsRepairedForUngroupedMember() {
+        val id = tx.execute { seed().users.first() }
+        onboarding.submit(id, request)
+        val groupId = checkNotNull(myGroup.getMyGroup(id).groupId)
+        myGroup.leaveGroup(id, groupId)
+        val midnight = Instant.parse("2030-11-16T15:00:00Z")
+        val tomorrow = currentMissions.personal(id, midnight.plusSeconds(86_400))
+        assertEquals(tomorrow, currentMissions.personal(id, midnight.plusSeconds(86_400)))
+        assertEquals("2030-11-18", tomorrow.mission.missionDate.toString())
+        assertEquals("+09:00", tomorrow.mission.startsAt.offset.toString())
+        assertEquals(true, tomorrow.canCertify)
+        assertEquals(MyGroupErrorCode.GROUP_NOT_FOUND, assertThrows<BusinessException> {
+            currentMissions.group(id)
+        }.errorCode)
     }
 
     private fun groupCertificationRequest(missionId: Long) = CertificationRegisterRequest(

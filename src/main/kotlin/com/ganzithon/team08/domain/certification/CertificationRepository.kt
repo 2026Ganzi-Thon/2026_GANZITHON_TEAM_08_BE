@@ -11,6 +11,14 @@ import java.time.LocalDate
 interface CertificationRepository : JpaRepository<Certification, Long> {
     fun findAllByUser_UserIdAndVisibility(userId: Long, visibility: Visibility): List<Certification>
 
+    @Query("""
+        select distinct c.user.userId from Certification c
+        where c.assignment.assignmentId = :assignmentId
+          and c.group.groupId = :groupId
+          and c.missionType = com.ganzithon.team08.domain.mission.MissionType.GROUP
+    """)
+    fun findGroupAssignmentCompletedUserIds(assignmentId: Long, groupId: Long): List<Long>
+
     fun findByUser_UserIdAndMissionTypeAndMissionDate(
         userId: Long,
         missionType: MissionType,

@@ -12,5 +12,7 @@ internal object MissionPeriod {
 
     fun dateAt(instant: Instant): LocalDate = instant.atZone(seoul).toLocalDate()
 
+    fun startOf(date: LocalDate) = date.atStartOfDay(seoul).toOffsetDateTime()
+
     fun weekStart(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 }
