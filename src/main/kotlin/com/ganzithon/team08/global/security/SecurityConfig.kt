@@ -11,12 +11,14 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository
 import org.springframework.security.web.csrf.CsrfToken
 import org.springframework.security.web.csrf.CsrfTokenRequestHandler
 import java.util.function.Supplier
+import com.ganzithon.team08.domain.user.UserRepository
 
 @Configuration
 class SecurityConfig(
     private val jwtProvider: JwtProvider,
     private val authenticationEntryPoint: JwtAuthenticationEntryPoint,
     private val accessDeniedHandler: JwtAccessDeniedHandler,
+    private val userRepository: UserRepository,
 ) {
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -45,7 +47,7 @@ class SecurityConfig(
                     .requestMatchers("/actuator/health", "/api/auth/kakao", "/api/auth/kakao/callback", "/api/auth/refresh").permitAll()
                     .anyRequest().authenticated()
             }
-            .addFilterBefore(JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(JwtAuthenticationFilter(jwtProvider, userRepository), UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }

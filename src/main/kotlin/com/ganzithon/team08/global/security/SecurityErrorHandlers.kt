@@ -35,7 +35,7 @@ class JwtAccessDeniedHandler : AccessDeniedHandler {
     }
 }
 
-private object SecurityErrorResponseWriter {
+internal object SecurityErrorResponseWriter {
     fun write(response: HttpServletResponse, status: Int, code: String, message: String) {
         response.status = status
         response.contentType = MediaType.APPLICATION_JSON_VALUE
