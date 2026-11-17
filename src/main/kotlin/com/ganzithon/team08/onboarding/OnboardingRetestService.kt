@@ -73,7 +73,9 @@ class OnboardingRetestService(
         val existing = answers.findAllByUser_UserIdOrderByQuestion_QuestionIdAsc(userId)
             .associateBy { it.question.questionId }
 
-        val rematched = user.group != null && (user.lifeStage != lifeStage || user.userType?.typeCode != type.typeCode)
+        val lifeStageChanged = user.lifeStage != lifeStage
+        val typeChanged = user.userType?.typeCode != type.typeCode
+        val rematched = user.group != null && (lifeStageChanged || typeChanged)
         val target = if (rematched) groups.rematch(user, lifeStage, type) else null
 
         answers.saveAll(submitted.mapNotNull { answer ->
@@ -94,7 +96,15 @@ class OnboardingRetestService(
         }
 
         return OnboardingRetestResult(
-            lifeStage, type.typeCode, type.typeName, result.carePreference, user.group?.groupId, rematched,
+            lifeStage = lifeStage,
+            typeCode = type.typeCode,
+            typeName = type.typeName,
+            typeDescription = type.typeDescription,
+            carePreference = result.carePreference,
+            lifeStageChanged = lifeStageChanged,
+            typeChanged = typeChanged,
+            groupRematched = rematched,
+            groupId = user.group?.groupId,
         )
     }
 
@@ -116,7 +126,10 @@ data class OnboardingRetestResult(
     val lifeStage: LifeStage,
     val typeCode: String,
     val typeName: String,
+    val typeDescription: String,
     val carePreference: AnswerChoice,
+    val lifeStageChanged: Boolean,
+    val typeChanged: Boolean,
     val groupId: Long?,
     val groupRematched: Boolean,
 )
