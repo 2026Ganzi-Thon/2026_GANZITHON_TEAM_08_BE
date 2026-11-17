@@ -51,3 +51,8 @@ kotlin {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// 평범한 jar(-plain.jar)는 안 쓰고 bootJar 실행용 jar 하나만 만든다 — Dockerfile에서 COPY할 파일을 명확히 하기 위함.
+tasks.named<Jar>("jar") {
+    enabled = false
+}
