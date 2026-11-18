@@ -1,6 +1,8 @@
 // springdoc-openapi가 전체 컨텍스트에서 정상적으로 API 문서를 생성하는지 확인한다.
 package com.ganzithon.team08
 
+import com.ganzithon.team08.global.security.JwtProvider
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -14,10 +16,13 @@ import org.springframework.test.web.servlet.get
 @ActiveProfiles("test")
 class ApiDocsSmokeTests @Autowired constructor(
     private val mockMvc: MockMvc,
+    private val jwtProvider: JwtProvider,
 ) {
     @Test
     fun openApiDocumentIsGenerated() {
-        mockMvc.get("/v3/api-docs").andExpect {
+        mockMvc.get("/v3/api-docs") {
+            cookie(Cookie("ACCESS_TOKEN", jwtProvider.createAccessToken(1L)))
+        }.andExpect {
             status { isOk() }
             content { string(org.hamcrest.Matchers.containsString("/api/feed")) }
             content { string(org.hamcrest.Matchers.containsString("/api/certifications/{certificationId}/cheers")) }
