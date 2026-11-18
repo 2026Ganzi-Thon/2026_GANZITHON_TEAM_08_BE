@@ -7,6 +7,8 @@ import com.ganzithon.team08.global.security.JwtProvider
 import com.ganzithon.team08.global.exception.BusinessException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.client.RestClientException
 import java.util.UUID
 
 @Service
@@ -24,7 +26,7 @@ class KakaoAuthService(
 
     @Transactional
     fun login(code: String): LoginResult {
-        val kakaoUser = kakaoApiClient.requestUser(kakaoApiClient.requestAccessToken(code, kakaoAuthProperties).access_token)
+        val kakaoUser = fetchKakaoUser(code)
         val user = userRepository.findByKakaoUserId(kakaoUser.id.toString())
             ?: userRepository.save(User(kakaoUser.id.toString(), kakaoUser.nickname()))
         if (user.status.name != "ACTIVE") throw BusinessException(AuthErrorCode.ACCOUNT_WITHDRAWN)
@@ -33,6 +35,17 @@ class KakaoAuthService(
         user.updateRefreshTokenHash(refreshToken)
         return LoginResult(accessToken, refreshToken, user.onboardingCompleted)
     }
+
+    // 카카오 토큰 교환·사용자정보 조회 실패를 INTERNAL_SERVER_ERROR로 뭉개지 않고
+    // 의도된 카카오 전용 에러코드로 구분해 응답한다(원인 설정값은 로그 정책상 남기지 않는다).
+    private fun fetchKakaoUser(code: String): KakaoUserResponse =
+        try {
+            kakaoApiClient.requestUser(kakaoApiClient.requestAccessToken(code, kakaoAuthProperties).access_token)
+        } catch (ex: HttpClientErrorException.Unauthorized) {
+            throw BusinessException(AuthErrorCode.KAKAO_AUTH_FAILED)
+        } catch (ex: RestClientException) {
+            throw BusinessException(AuthErrorCode.KAKAO_API_ERROR)
+        }
 
     private fun KakaoUserResponse.nickname(): String =
         kakao_account?.profile?.nickname?.takeIf { it.isNotBlank() }
