@@ -2,6 +2,7 @@
 package com.ganzithon.team08.global.exception
 
 data class ErrorResponse(
+    val status: Int,
     val code: String,
     val message: String,
     val errors: List<FieldViolation> = emptyList(),
@@ -10,6 +11,6 @@ data class ErrorResponse(
 
     companion object {
         fun from(code: ErrorCode, errors: List<FieldViolation> = emptyList()): ErrorResponse =
-            ErrorResponse(code.code, code.message, errors)
+            ErrorResponse(code.status.value(), code.code, code.message, errors)
     }
 }

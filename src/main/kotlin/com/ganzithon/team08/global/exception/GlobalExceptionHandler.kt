@@ -54,7 +54,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         val response = if (code != null) {
             ErrorResponse.from(code, fieldViolations(ex))
         } else {
-            ErrorResponse("HTTP_${statusCode.value()}", "요청을 처리할 수 없습니다.")
+            ErrorResponse(statusCode.value(), "HTTP_${statusCode.value()}", "요청을 처리할 수 없습니다.")
         }
         return respond(response, statusCode, headers, request)
     }
