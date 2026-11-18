@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
@@ -179,7 +180,10 @@ class OnboardingIntegrationTests @Autowired constructor(
         onboarding.submit(id, request)
         val before = tx.execute { personalAssignmentId(id) }
         val result = retest.submit(id, withAnswer(3, AnswerChoice.B))
+        assertEquals("설명", result.typeDescription)
         assertEquals(AnswerChoice.B, result.carePreference)
+        assertFalse(result.lifeStageChanged)
+        assertFalse(result.typeChanged)
         assertFalse(result.groupRematched)
         assertNotNull(result.groupId)
         assertEquals(AnswerChoice.B, retest.getCurrentAnswers(id).answers.single { it.questionId == 3 }.choice)
@@ -199,6 +203,9 @@ class OnboardingIntegrationTests @Autowired constructor(
         }
         val result = retest.submit(id, changedType())
         assertEquals("TYPE_02", result.typeCode)
+        assertEquals("설명", result.typeDescription)
+        assertFalse(result.lifeStageChanged)
+        assertTrue(result.typeChanged)
         assertNull(result.groupId)
         assertFalse(result.groupRematched)
         assertEquals(1L, tx.execute { count("CareGroup") })
