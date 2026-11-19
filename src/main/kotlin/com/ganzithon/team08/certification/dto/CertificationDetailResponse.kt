@@ -14,13 +14,20 @@ data class CertificationDetailResponse(
     val visibility: Visibility,
     val cheerCount: Long,
     val cheered: Boolean,
+    val commentCount: Long,
     val mine: Boolean,
     val createdAt: OffsetDateTime,
 ) {
     companion object {
         private val SEOUL = ZoneId.of("Asia/Seoul")
 
-        fun from(certification: Certification, cheerCount: Long, cheered: Boolean, mine: Boolean): CertificationDetailResponse {
+        fun from(
+            certification: Certification,
+            cheerCount: Long,
+            cheered: Boolean,
+            commentCount: Long,
+            mine: Boolean,
+        ): CertificationDetailResponse {
             val certificationId = requireNotNull(certification.certificationId)
             return CertificationDetailResponse(
                 nickname = certification.user.nickname,
@@ -30,6 +37,7 @@ data class CertificationDetailResponse(
                 visibility = certification.visibility,
                 cheerCount = cheerCount,
                 cheered = cheered,
+                commentCount = commentCount,
                 mine = mine,
                 createdAt = certification.createdAt.atZone(SEOUL).toOffsetDateTime(),
             )

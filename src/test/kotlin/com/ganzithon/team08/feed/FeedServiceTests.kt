@@ -6,6 +6,7 @@ import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
 import com.ganzithon.team08.domain.cheer.Cheer
 import com.ganzithon.team08.domain.cheer.CheerRepository
+import com.ganzithon.team08.domain.comment.CommentRepository
 import com.ganzithon.team08.domain.group.CareGroup
 import com.ganzithon.team08.domain.mission.Mission
 import com.ganzithon.team08.domain.mission.MissionAssignment
@@ -35,6 +36,7 @@ class FeedServiceTests @Autowired constructor(
     private val userRepository: UserRepository,
     private val certificationRepository: CertificationRepository,
     private val cheerRepository: CheerRepository,
+    private val commentRepository: CommentRepository,
 ) {
     private val today = LocalDate.now(ZoneId.of("Asia/Seoul"))
 
@@ -205,7 +207,7 @@ class FeedServiceTests @Autowired constructor(
         assertEquals(FeedErrorCode.INVALID_PAGE_SIZE, exception.errorCode)
     }
 
-    private fun service(): FeedService = FeedService(certificationRepository, cheerRepository, userRepository)
+    private fun service(): FeedService = FeedService(certificationRepository, cheerRepository, commentRepository, userRepository)
 
     private var userSequence = 0
     private var dateSequence = 0

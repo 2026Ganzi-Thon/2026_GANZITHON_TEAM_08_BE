@@ -5,6 +5,7 @@ import com.ganzithon.team08.domain.certification.Certification
 import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
 import com.ganzithon.team08.domain.cheer.CheerRepository
+import com.ganzithon.team08.domain.comment.CommentRepository
 import com.ganzithon.team08.domain.user.UserRepository
 import com.ganzithon.team08.feed.dto.FeedItemResponse
 import com.ganzithon.team08.feed.dto.FeedResponse
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional
 class FeedService(
     private val certificationRepository: CertificationRepository,
     private val cheerRepository: CheerRepository,
+    private val commentRepository: CommentRepository,
     private val userRepository: UserRepository,
 ) {
     @Transactional(readOnly = true)
@@ -43,12 +45,15 @@ class FeedService(
         val cheerCounts = cheerRepository.countByCertificationIds(certificationIds)
             .associate { it.getCertificationId() to it.getCheerCount() }
         val cheeredIds = cheerRepository.findCertificationIdsCheeredBy(viewerId, certificationIds).toSet()
+        val commentCounts = commentRepository.countByCertificationIds(certificationIds)
+            .associate { it.getCertificationId() to it.getCommentCount() }
         val items = page.map { certification ->
             val certificationId = requireNotNull(certification.certificationId)
             FeedItemResponse.from(
                 certification = certification,
                 cheerCount = cheerCounts[certificationId] ?: 0L,
                 cheered = cheeredIds.contains(certificationId),
+                commentCount = commentCounts[certificationId] ?: 0L,
                 mine = certification.user.userId == viewerId,
             )
         }

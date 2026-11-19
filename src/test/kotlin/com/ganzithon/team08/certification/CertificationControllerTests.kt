@@ -80,6 +80,7 @@ class CertificationControllerTests @Autowired constructor(
             visibility = Visibility.PUBLIC,
             cheerCount = 3,
             cheered = true,
+            commentCount = 2,
             mine = false,
             createdAt = OffsetDateTime.parse("2026-11-09T10:00:00+09:00"),
         )
@@ -119,6 +120,7 @@ class CertificationControllerTests @Autowired constructor(
             visibility = Visibility.PUBLIC,
             cheerCount = 0,
             cheered = false,
+            commentCount = 0,
             mine = true,
             createdAt = OffsetDateTime.parse("2026-11-09T10:00:00+09:00"),
         )

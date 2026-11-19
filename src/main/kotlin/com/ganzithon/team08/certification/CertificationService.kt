@@ -8,6 +8,7 @@ import com.ganzithon.team08.domain.certification.Certification
 import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
 import com.ganzithon.team08.domain.cheer.CheerRepository
+import com.ganzithon.team08.domain.comment.CommentRepository
 import com.ganzithon.team08.domain.mission.MissionAssignmentService
 import com.ganzithon.team08.domain.mission.MissionPeriod
 import com.ganzithon.team08.domain.user.User
@@ -28,6 +29,7 @@ class CertificationService(
     private val userRepository: UserRepository,
     private val certificationRepository: CertificationRepository,
     private val cheerRepository: CheerRepository,
+    private val commentRepository: CommentRepository,
     private val missionAssignmentService: MissionAssignmentService,
     private val imageStorage: ImageStorage,
 ) {
@@ -103,7 +105,8 @@ class CertificationService(
         val certificationId = requireNotNull(certification.certificationId)
         val cheerCount = cheerRepository.countByCertification_CertificationId(certificationId)
         val cheered = cheerRepository.existsByUser_UserIdAndCertification_CertificationId(viewer.userId!!, certificationId)
-        return CertificationDetailResponse.from(certification, cheerCount, cheered, certification.isOwnedBy(viewer))
+        val commentCount = commentRepository.countByCertification_CertificationId(certificationId)
+        return CertificationDetailResponse.from(certification, cheerCount, cheered, commentCount, certification.isOwnedBy(viewer))
     }
 
     private fun getCertificationOrThrow(certificationId: Long): Certification =

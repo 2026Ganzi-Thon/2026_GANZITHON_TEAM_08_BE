@@ -7,6 +7,7 @@ import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
 import com.ganzithon.team08.domain.cheer.Cheer
 import com.ganzithon.team08.domain.cheer.CheerRepository
+import com.ganzithon.team08.domain.comment.CommentRepository
 import com.ganzithon.team08.domain.group.CareGroup
 import com.ganzithon.team08.domain.mission.Mission
 import com.ganzithon.team08.domain.mission.MissionAssignment
@@ -46,6 +47,7 @@ class CertificationServiceTests @Autowired constructor(
     private val userRepository: UserRepository,
     private val certificationRepository: CertificationRepository,
     private val cheerRepository: CheerRepository,
+    private val commentRepository: CommentRepository,
     private val missionRepository: MissionRepository,
     private val missionAssignmentRepository: MissionAssignmentRepository,
 ) {
@@ -353,7 +355,7 @@ class CertificationServiceTests @Autowired constructor(
 
     private fun service(storage: ImageStorage): CertificationService {
         val missionAssignmentService = MissionAssignmentService(missionRepository, missionAssignmentRepository, userRepository)
-        return CertificationService(userRepository, certificationRepository, cheerRepository, missionAssignmentService, storage)
+        return CertificationService(userRepository, certificationRepository, cheerRepository, commentRepository, missionAssignmentService, storage)
     }
 
     private fun jpegImage(): MockMultipartFile = MockMultipartFile("image", "photo.jpg", "image/jpeg", jpegBytes)
