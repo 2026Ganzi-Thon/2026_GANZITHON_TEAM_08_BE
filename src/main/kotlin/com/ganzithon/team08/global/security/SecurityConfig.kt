@@ -44,7 +44,15 @@ class SecurityConfig(
             }
             .authorizeHttpRequests { requests ->
                 requests
-                    .requestMatchers("/actuator/health", "/api/auth/kakao", "/api/auth/kakao/callback", "/api/auth/refresh").permitAll()
+                    .requestMatchers(
+                        "/actuator/health",
+                        "/api/auth/kakao",
+                        "/api/auth/kakao/callback",
+                        "/api/auth/refresh",
+                        "/v3/api-docs/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                    ).permitAll()
                     .anyRequest().authenticated()
             }
             .addFilterBefore(JwtAuthenticationFilter(jwtProvider, userRepository), UsernamePasswordAuthenticationFilter::class.java)
