@@ -96,6 +96,22 @@ class FeedServiceTests @Autowired constructor(
     }
 
     @Test
+    fun groupFeedSkipsWithdrawnPublicAuthorBeforePaginating() {
+        val group = newGroup()
+        val viewer = newUser(group, "viewer")
+        val active = certification(group, Visibility.PUBLIC, newUser(group, "active"))
+        val withdrawn = newUser(group, "withdrawn")
+        certification(group, Visibility.PUBLIC, withdrawn)
+        withdrawn.withdraw()
+        entityManager.flush()
+
+        val page = service().getGroupFeed(viewer.userId!!, null, 1)
+
+        assertEquals(listOf(active.certificationId), page.items.map { it.certificationId })
+        assertFalse(page.hasNext)
+    }
+
+    @Test
     fun groupFeedIncludesCurrentGroupMembersGroupAndPublicCertifications() {
         val group = newGroup()
         val author = newUser(group, "author")

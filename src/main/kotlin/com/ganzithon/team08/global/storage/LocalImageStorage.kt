@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component
 import java.io.FileNotFoundException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 @Component
@@ -32,6 +33,18 @@ class LocalImageStorage(
 
     override fun delete(storageKey: String) {
         Files.deleteIfExists(resolve(storageKey))
+    }
+
+    override fun replace(storageKey: String, content: ByteArray) {
+        val target = resolve(storageKey)
+        if (!Files.isRegularFile(target)) throw FileNotFoundException("교체할 사진이 없습니다.")
+        val temporary = Files.createTempFile(target.parent, ".sanitize-", ".tmp")
+        try {
+            Files.write(temporary, content)
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
     }
 
     // storageKey는 서버가 UUID로 발급하지만, 경로 조작(../)으로 저장 루트를 벗어나지 못하도록 한 번 더 막는다.

@@ -7,6 +7,8 @@ interface ImageStorage {
 
     fun load(storageKey: String): ByteArray
 
+    fun replace(storageKey: String, content: ByteArray)
+
     // 이미 삭제된 키를 다시 삭제해도 예외를 던지지 않는다 (탈퇴 재시도에서 반복 호출될 수 있음).
     fun delete(storageKey: String)
 }

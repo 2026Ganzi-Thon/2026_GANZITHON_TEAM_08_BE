@@ -1,6 +1,8 @@
 // 응원 등록의 정상 처리와 본인응원·중복응원·열람권한·탈퇴작성자 거절을 검증한다.
 package com.ganzithon.team08.cheer
 
+import com.ganzithon.team08.certification.CertificationInteractionAccess
+
 import com.ganzithon.team08.certification.CertificationErrorCode
 import com.ganzithon.team08.domain.certification.Certification
 import com.ganzithon.team08.domain.certification.CertificationRepository
@@ -128,7 +130,7 @@ class CheerServiceTests @Autowired constructor(
         assertEquals(CommonErrorCode.NOT_FOUND, exception.errorCode)
     }
 
-    private fun service(): CheerService = CheerService(userRepository, certificationRepository, cheerRepository)
+    private fun service(): CheerService = CheerService(cheerRepository, CertificationInteractionAccess(userRepository, certificationRepository))
 
     private fun certification(fixture: Fixture, visibility: Visibility): Certification =
         Certification(fixture.user, fixture.assignment, "images/walk.jpg", "산책을 완료했습니다.", visibility)

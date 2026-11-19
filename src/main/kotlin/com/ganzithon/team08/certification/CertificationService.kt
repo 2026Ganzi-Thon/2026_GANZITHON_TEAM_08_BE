@@ -17,10 +17,15 @@ import com.ganzithon.team08.domain.user.UserStatus
 import com.ganzithon.team08.global.exception.BusinessException
 import com.ganzithon.team08.global.exception.CommonErrorCode
 import com.ganzithon.team08.global.storage.ImageFormat
+import com.ganzithon.team08.global.storage.ImageSanitizer
 import com.ganzithon.team08.global.storage.ImageStorage
+import com.ganzithon.team08.global.storage.InvalidImageException
+import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile
 import java.time.Instant
 
@@ -32,6 +37,7 @@ class CertificationService(
     private val commentRepository: CommentRepository,
     private val missionAssignmentService: MissionAssignmentService,
     private val imageStorage: ImageStorage,
+    private val imageSanitizer: ImageSanitizer,
 ) {
     @Transactional
     fun register(userId: Long, request: CertificationRegisterRequest): CertificationRegisterResponse {
@@ -39,6 +45,7 @@ class CertificationService(
         // 그룹 변경(이동·탈퇴)과 같은 사용자 row 잠금을 사용해 동시성을 맞춘다 — 그룹 스냅샷을
         // 읽는 동안 그룹이 바뀌면 안 되므로, 그룹 변경 트랜잭션도 같은 방식으로 잠궈야 한다.
         val user = userRepository.findForUpdate(userId) ?: throw BusinessException(CommonErrorCode.NOT_FOUND)
+        if (user.status != UserStatus.ACTIVE) throw BusinessException(CommonErrorCode.ACCOUNT_WITHDRAWN)
         if (request.visibility == Visibility.GROUP && user.group == null) {
             throw BusinessException(CertificationErrorCode.CERT_INVALID_VISIBILITY)
         }
@@ -52,9 +59,17 @@ class CertificationService(
         )
 
         val (imageBytes, format) = validateImage(request.image)
-        val storageKey = imageStorage.save(imageBytes, format)
+        val cleaned = try {
+            imageSanitizer.sanitize(imageBytes, format)
+        } catch (_: InvalidImageException) {
+            throw BusinessException(CertificationErrorCode.CERT_INVALID_IMAGE)
+        }
+        val storageKey = imageStorage.save(cleaned, format)
+        deleteOnRollback(storageKey)
         val saved = try {
-            val certification = Certification(user, assignment, storageKey, content, request.visibility)
+            val certification = Certification(user, assignment, storageKey, content, request.visibility).apply {
+                markImageSanitized()
+            }
             certificationRepository.save(certification)
         } catch (ex: DataIntegrityViolationException) {
             imageStorage.delete(storageKey)
@@ -65,6 +80,19 @@ class CertificationService(
         }
 
         return CertificationRegisterResponse.from(saved)
+    }
+
+    private fun deleteOnRollback(storageKey: String) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCompletion(status: Int) {
+                if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+                    runCatching { imageStorage.delete(storageKey) }.onFailure {
+                        logger.warn("인증 등록 롤백 후 이미지 정리에 실패했습니다. error={}", it.javaClass.simpleName)
+                    }
+                }
+            }
+        })
     }
 
     @Transactional(readOnly = true)
@@ -112,7 +140,7 @@ class CertificationService(
     private fun getCertificationOrThrow(certificationId: Long): Certification =
         certificationRepository.findById(certificationId).orElseThrow { BusinessException(CertificationErrorCode.CERT_NOT_FOUND) }
 
-    // 탈퇴 MVP 단순화: 실제 삭제 대신 조회에서 숨긴다 — 작성자가 탈퇴했으면 존재하지 않는 것처럼 404.
+    // 삭제 작업이 대기 중이어도 탈퇴 회원의 인증은 숨긴다.
     private fun requireActiveAuthor(certification: Certification) {
         if (certification.user.status != UserStatus.ACTIVE) throw BusinessException(CertificationErrorCode.CERT_NOT_FOUND)
     }
@@ -136,6 +164,7 @@ class CertificationService(
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger(CertificationService::class.java)
         private const val MAX_CONTENT_LENGTH = 300
         private const val MAX_IMAGE_BYTES = 10L * 1024 * 1024
     }

@@ -13,6 +13,20 @@ interface UserRepository : JpaRepository<User, Long> {
     @Query("select target from User target where target.userId = :id")
     fun findForUpdate(id: Long): User?
 
+    @Query("select u.userId from User u where u.kakaoUserId = :kakaoUserId")
+    fun findUserIdByKakaoUserId(kakaoUserId: String): Long?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.userId in :ids order by u.userId")
+    fun findAllForUpdate(ids: Set<Long>): List<User>
+
+    @Query("""
+        select u.userId from User u where u.status = :status and not exists (
+            select t.taskId from CleanupTask t where t.withdrawnUserId = u.userId
+        ) order by u.userId
+    """)
+    fun findUnscheduledWithdrawalIds(status: UserStatus, page: Pageable): List<Long>
+
     fun findAllByGroup_GroupIdAndStatusOrderByUserIdAsc(groupId: Long, status: UserStatus): List<User>
 
     fun countByGroup_GroupIdAndStatus(groupId: Long, status: UserStatus): Long

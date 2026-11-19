@@ -17,7 +17,10 @@ import jakarta.validation.constraints.Size
 import java.time.Instant
 
 @Entity
-@Table(name = "cleanup_tasks", indexes = [Index(name = "idx_cleanup_retry", columnList = "status,next_retry_at")])
+@Table(name = "cleanup_tasks", indexes = [
+    Index(name = "idx_cleanup_retry", columnList = "status,next_retry_at"),
+    Index(name = "idx_cleanup_user", columnList = "withdrawn_user_id"),
+])
 class CleanupTask(taskType: CleanupTaskType, targetReference: String) : BaseTimeEntity() {
     @field:Id
     @field:GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,6 +38,14 @@ class CleanupTask(taskType: CleanupTaskType, targetReference: String) : BaseTime
     @field:Size(max = 1024)
     var targetReference: String = targetReference
         protected set
+
+    @field:Column(name = "withdrawn_user_id", updatable = false)
+    var withdrawnUserId: Long? = null
+        protected set
+
+    constructor(taskType: CleanupTaskType, targetReference: String, withdrawnUserId: Long) : this(taskType, targetReference) {
+        this.withdrawnUserId = withdrawnUserId
+    }
 
     @field:Enumerated(EnumType.STRING)
     @field:Column(nullable = false, length = 20)
@@ -54,12 +65,18 @@ class CleanupTask(taskType: CleanupTaskType, targetReference: String) : BaseTime
     var lastError: String? = null
         protected set
 
-    fun start() {
+    fun start(leaseUntil: Instant? = null) {
         check(status == CleanupTaskStatus.PENDING || status == CleanupTaskStatus.FAILED) {
             "대기 중이거나 실패한 작업만 시작할 수 있습니다."
         }
         status = CleanupTaskStatus.PROCESSING
-        nextRetryAt = null
+        nextRetryAt = leaseUntil
+    }
+
+    fun reclaim(now: Instant, leaseUntil: Instant) {
+        check(status == CleanupTaskStatus.PROCESSING && nextRetryAt?.isAfter(now) == false)
+        retryCount += 1
+        nextRetryAt = leaseUntil
     }
 
     fun fail(error: String, nextRetryAt: Instant) {

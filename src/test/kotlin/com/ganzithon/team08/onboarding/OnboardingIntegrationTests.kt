@@ -30,6 +30,7 @@ import com.ganzithon.team08.domain.user.UserTypeMatchingAccess
 import com.ganzithon.team08.global.exception.BusinessException
 import com.ganzithon.team08.global.storage.ImageFormat
 import com.ganzithon.team08.global.storage.ImageStorage
+import com.ganzithon.team08.global.storage.PillowImageSanitizer
 import com.ganzithon.team08.group.MyGroupErrorCode
 import com.ganzithon.team08.group.MyGroupService
 import jakarta.persistence.EntityManager
@@ -72,6 +73,7 @@ import java.util.concurrent.TimeUnit
     OnboardingRetestService::class, GroupCertificationPrivacyService::class, CertificationService::class,
     MissionRefreshJobs::class, MyGroupService::class, FeedService::class, CurrentMissionService::class, MissionCertificationQueries::class, MissionAssignmentService::class, OnboardingIntegrationTests.StorageConfig::class,
     MissionAllocator::class, UserAssignmentAccess::class, UserTypeMatchingAccess::class, GroupAssignmentAccess::class,
+    PillowImageSanitizer::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OnboardingIntegrationTests @Autowired constructor(
@@ -548,7 +550,7 @@ class OnboardingIntegrationTests @Autowired constructor(
     }
 
     private fun groupCertificationRequest(missionId: Long) = CertificationRegisterRequest(
-        MockMultipartFile("image", "test.jpg", "image/jpeg", byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0)),
+        MockMultipartFile("image", "test.jpg", "image/jpeg", requireNotNull(javaClass.getResourceAsStream("/privacy/gps-orientation.jpg")).use { it.readAllBytes() }),
         "그룹 미션 완료", MissionType.GROUP, missionId, Visibility.GROUP,
     )
 
@@ -585,6 +587,7 @@ class OnboardingIntegrationTests @Autowired constructor(
         }
 
         override fun load(storageKey: String): ByteArray = error("사진 조회는 이 테스트의 범위 밖입니다.")
+        override fun replace(storageKey: String, content: ByteArray) = error("사진 교체는 이 테스트의 범위 밖입니다.")
         override fun delete(storageKey: String) = Unit
     }
 

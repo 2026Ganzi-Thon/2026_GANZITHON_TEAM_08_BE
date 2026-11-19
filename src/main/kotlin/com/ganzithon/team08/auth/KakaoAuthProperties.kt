@@ -11,4 +11,5 @@ class KakaoAuthProperties(
     @Value("\${kakao.redirect-uri}") val redirectUri: String,
     @Value("\${kakao.frontend-onboarding-path:/onboarding}") val onboardingPath: String,
     @Value("\${kakao.frontend-home-path:/home}") val homePath: String,
+    @Value("\${kakao.admin-key:}") val adminKey: String = "",
 )

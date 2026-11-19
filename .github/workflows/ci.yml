@@ -33,7 +33,12 @@ jobs:
           cache-provider: basic
 
       - name: Build and test
-        run: ./gradlew clean build --no-daemon
+        env:
+          IMAGE_PYTHON_EXECUTABLE: /usr/bin/python3
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-pil
+          ./gradlew clean build --no-daemon
 
   docker:
     needs: test
@@ -96,7 +101,9 @@ jobs:
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
               -e KAKAO_CLIENT_ID="${{ secrets.KAKAO_CLIENT_ID }}" \
               -e KAKAO_CLIENT_SECRET="${{ secrets.KAKAO_CLIENT_SECRET }}" \
+              -e KAKAO_ADMIN_KEY="${{ secrets.KAKAO_ADMIN_KEY }}" \
               -e KAKAO_REDIRECT_URI="${{ secrets.KAKAO_REDIRECT_URI }}" \
+              -e PRIVACY_LEGACY_ENABLED="${{ vars.PRIVACY_LEGACY_ENABLED || 'false' }}" \
               -e IMAGE_STORAGE_DIR="/data/images" \
               -v "$HOME/data/images:/data/images" \
               "$IMAGE"
