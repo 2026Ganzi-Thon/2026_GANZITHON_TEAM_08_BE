@@ -2,6 +2,7 @@
 package com.ganzithon.team08.comment
 
 import com.ganzithon.team08.certification.CertificationErrorCode
+import com.ganzithon.team08.certification.CertificationInteractionAccess
 import com.ganzithon.team08.comment.dto.CommentListResponse
 import com.ganzithon.team08.comment.dto.CommentResponse
 import com.ganzithon.team08.domain.certification.Certification
@@ -21,14 +22,11 @@ class CommentService(
     private val userRepository: UserRepository,
     private val certificationRepository: CertificationRepository,
     private val commentRepository: CommentRepository,
+    private val interactionAccess: CertificationInteractionAccess,
 ) {
     @Transactional
     fun register(viewerId: Long, certificationId: Long, content: String): CommentResponse {
-        val viewer = getUser(viewerId)
-        val certification = getCertificationOrThrow(certificationId)
-        requireActiveAuthor(certification)
-        if (!certification.isVisibleTo(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
-
+        val (viewer, certification) = interactionAccess.lockForWrite(viewerId, certificationId)
         val comment = commentRepository.save(Comment(viewer, certification, content))
         return CommentResponse.from(comment, mine = true)
     }
@@ -61,7 +59,7 @@ class CommentService(
     private fun getCertificationOrThrow(certificationId: Long): Certification =
         certificationRepository.findById(certificationId).orElseThrow { BusinessException(CertificationErrorCode.CERT_NOT_FOUND) }
 
-    // 탈퇴 MVP 단순화: 실제 삭제 대신 조회에서 숨긴다 — 작성자가 탈퇴했으면 존재하지 않는 것처럼 404.
+    // 삭제 작업이 대기 중이어도 탈퇴 회원의 인증은 숨긴다.
     private fun requireActiveAuthor(certification: Certification) {
         if (certification.user.status != UserStatus.ACTIVE) throw BusinessException(CertificationErrorCode.CERT_NOT_FOUND)
     }

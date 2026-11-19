@@ -355,7 +355,7 @@ class CertificationServiceTests @Autowired constructor(
 
     private fun service(storage: ImageStorage): CertificationService {
         val missionAssignmentService = MissionAssignmentService(missionRepository, missionAssignmentRepository, userRepository)
-        return CertificationService(userRepository, certificationRepository, cheerRepository, commentRepository, missionAssignmentService, storage)
+        return CertificationService(userRepository, certificationRepository, cheerRepository, commentRepository, missionAssignmentService, storage) { bytes, _ -> bytes }
     }
 
     private fun jpegImage(): MockMultipartFile = MockMultipartFile("image", "photo.jpg", "image/jpeg", jpegBytes)
@@ -394,6 +394,10 @@ private class FakeImageStorage : ImageStorage {
     }
 
     override fun load(storageKey: String): ByteArray = saved.getValue(storageKey)
+
+    override fun replace(storageKey: String, content: ByteArray) {
+        saved[storageKey] = content
+    }
 
     override fun delete(storageKey: String) {
         saved.remove(storageKey)

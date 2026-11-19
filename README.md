@@ -13,6 +13,8 @@ Kotlin과 Spring Boot 기반 백엔드 프로젝트입니다.
 
 JDK 21을 설치하고 `JAVA_HOME`이 해당 JDK를 가리키도록 설정합니다. Gradle은 별도로 설치할 필요가 없습니다. 처음 빌드할 때 Wrapper와 의존성을 내려받으므로 인터넷 연결이 필요합니다.
 
+인증 사진을 처리하거나 관련 테스트를 실행하려면 Python 3과 WebP 지원이 포함된 Pillow가 필요합니다. Docker 이미지는 이를 함께 설치합니다. 로컬에서는 Pillow가 설치된 가상 환경의 Python 실행 파일을 `IMAGE_PYTHON_EXECUTABLE`로 지정할 수 있습니다.
+
 Kotlin JPA 플러그인을 사용해 엔티티의 기본 생성자와 프록시 지원을 구성합니다.
 
 macOS에서는 다음과 같이 JDK를 선택할 수 있습니다.
@@ -75,6 +77,12 @@ Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용합니다. 테스트�
 
 GitHub Actions는 PR과 `main` 브랜치 push 시 Java 21에서 `clean build`를 실행하며, 수동 실행도 지원합니다. 워크플로는 저장소에 반영된 이후 실행됩니다.
 
+## 탈퇴 및 기존 사진 정리
+
+`DELETE /api/auth/withdraw`의 `204`는 계정 비활성화와 정리 작업 등록 완료를 뜻합니다. 백그라운드 작업이 카카오 연결 해제와 파일 삭제를 완료하면 회원 데이터와 관련 작업 레코드를 삭제합니다. 카카오 앱 어드민 키는 서버의 `KAKAO_ADMIN_KEY` 환경변수 또는 배포용 GitHub Secret으로 지정합니다.
+
+기존 데이터 정리는 새 버전이 사진 볼륨을 사용하는 것을 확인한 뒤 `PRIVACY_LEGACY_ENABLED=true`로 활성화합니다. 기존 탈퇴 회원을 정리 작업에 등록하고, 기존 인증 사진은 동일한 키에 정리된 파일로 교체합니다. 작업은 진행 상태를 DB에 기록합니다. 파일과 DB 백업의 보존·파기 정책은 서비스 운영 설정에서 별도로 적용해야 합니다.
+
 ## 기본 구성
 
 - Spring MVC: REST API와 내장 Tomcat을 제공합니다.
@@ -110,7 +118,7 @@ src/
     └── resources/application-test.yml
 ```
 
-새 기능은 `com.ganzithon.team08` 아래에 추가하면 기본 컴포넌트 스캔에 포함됩니다. 현재는 엔티티, Spring Data JPA Repository와 상태 확인 API를 제공하며, 업무용 API·서비스·카카오 인증·이미지 저장·재시도 작업 실행기는 아직 구현하지 않았습니다.
+새 기능은 `com.ganzithon.team08` 아래에 추가하면 기본 컴포넌트 스캔에 포함됩니다.
 
 공통 설정은 `application.yml`에서 관리합니다. 비밀번호와 API 키는 환경변수 등 외부 설정으로 주입하며 저장소에 기록하지 않습니다. `.env` 파일은 Git에서 제외되지만 Spring Boot가 자동으로 읽지는 않습니다. 실행 환경이나 IDE에서 환경변수를 설정해야 합니다.
 

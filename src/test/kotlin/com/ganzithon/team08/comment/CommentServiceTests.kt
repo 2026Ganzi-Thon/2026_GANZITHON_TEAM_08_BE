@@ -1,6 +1,8 @@
 // 댓글 등록·조회·삭제의 정상 처리와 열람권한·탈퇴작성자·삭제권한 거절을 검증한다.
 package com.ganzithon.team08.comment
 
+import com.ganzithon.team08.certification.CertificationInteractionAccess
+
 import com.ganzithon.team08.certification.CertificationErrorCode
 import com.ganzithon.team08.domain.certification.Certification
 import com.ganzithon.team08.domain.certification.CertificationRepository
@@ -164,7 +166,10 @@ class CommentServiceTests @Autowired constructor(
         assertEquals(CommentErrorCode.COMMENT_NOT_FOUND, exception.errorCode)
     }
 
-    private fun service(): CommentService = CommentService(userRepository, certificationRepository, commentRepository)
+    private fun service(): CommentService = CommentService(
+        userRepository, certificationRepository, commentRepository,
+        CertificationInteractionAccess(userRepository, certificationRepository),
+    )
 
     private fun certification(fixture: Fixture, visibility: Visibility): Certification =
         Certification(fixture.user, fixture.assignment, "images/walk.jpg", "산책을 완료했습니다.", visibility)

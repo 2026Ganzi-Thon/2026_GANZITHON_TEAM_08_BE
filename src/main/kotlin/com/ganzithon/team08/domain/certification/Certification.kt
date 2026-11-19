@@ -22,6 +22,7 @@ import jakarta.persistence.UniqueConstraint
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.LocalDate
+import java.time.Instant
 
 @Entity
 @Table(
@@ -33,6 +34,7 @@ import java.time.LocalDate
         Index(name = "idx_certification_feed", columnList = "visibility,certification_id"),
         Index(name = "idx_certification_user_created", columnList = "user_id,created_at"),
         Index(name = "idx_certification_group_feed", columnList = "group_id,visibility,certification_id"),
+        Index(name = "idx_certification_image_cleanup", columnList = "image_sanitized,image_sanitize_retry_at,certification_id"),
     ],
 )
 class Certification(
@@ -77,6 +79,23 @@ class Certification(
     @field:Size(max = 1024)
     var imageStorageKey: String = imageStorageKey
         protected set
+
+    @field:Column(name = "image_sanitized")
+    var imageSanitized: Boolean? = null
+        protected set
+
+    @field:Column(name = "image_sanitize_retry_at")
+    var imageSanitizeRetryAt: Instant? = null
+        protected set
+
+    fun markImageSanitized() {
+        imageSanitized = true
+        imageSanitizeRetryAt = null
+    }
+
+    fun delayImageSanitization(retryAt: Instant) {
+        imageSanitizeRetryAt = retryAt
+    }
 
     @field:Column(nullable = false, length = 300, updatable = false)
     @field:NotBlank

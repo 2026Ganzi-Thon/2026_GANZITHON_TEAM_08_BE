@@ -33,8 +33,10 @@ class JwtAuthenticationFilter(
                     )
                     return
                 }
-                SecurityContextHolder.getContext().authentication =
-                    UsernamePasswordAuthenticationToken.authenticated(userId, null, emptyList())
+                if (user != null) {
+                    SecurityContextHolder.getContext().authentication =
+                        UsernamePasswordAuthenticationToken.authenticated(userId, null, emptyList())
+                }
             }
         }
         filterChain.doFilter(request, response)

@@ -7,8 +7,21 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.LocalDate
+import java.time.Instant
 
 interface CertificationRepository : JpaRepository<Certification, Long> {
+    @Query("select c.user.userId from Certification c where c.certificationId = :id")
+    fun findAuthorId(id: Long): Long?
+
+    @Query("""
+        select new com.ganzithon.team08.domain.certification.LegacyImage(c.certificationId, u.userId, c.imageStorageKey)
+        from Certification c join c.user u
+        where (c.imageSanitized is null or c.imageSanitized = false)
+          and (c.imageSanitizeRetryAt is null or c.imageSanitizeRetryAt <= :now)
+          and u.status = com.ganzithon.team08.domain.user.UserStatus.ACTIVE
+        order by c.certificationId
+    """)
+    fun findLegacyImages(now: Instant, page: Pageable): List<LegacyImage>
     fun findAllByUser_UserIdAndVisibility(userId: Long, visibility: Visibility): List<Certification>
 
     @Query("""
@@ -63,6 +76,7 @@ interface CertificationRepository : JpaRepository<Certification, Long> {
         join fetch c.assignment a
         join fetch a.mission
         where c.group.groupId = :groupId
+          and u.status = com.ganzithon.team08.domain.user.UserStatus.ACTIVE
           and c.visibility in :visibilities
           and (c.visibility <> com.ganzithon.team08.domain.certification.Visibility.GROUP or u.group.groupId = :groupId)
           and (:cursor is null or c.certificationId < :cursor)
@@ -108,3 +122,5 @@ interface CertificationRepository : JpaRepository<Certification, Long> {
         @Param("missionDate") missionDate: LocalDate,
     ): List<Certification>
 }
+
+data class LegacyImage(val id: Long, val userId: Long, val key: String)
