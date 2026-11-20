@@ -139,6 +139,19 @@ class CertificationService(
         return toDetailResponse(certification, viewer)
     }
 
+    @Transactional
+    fun delete(viewerId: Long, certificationId: Long) {
+        val viewer = userRepository.findForUpdate(viewerId) ?: throw BusinessException(CommonErrorCode.NOT_FOUND)
+        if (viewer.status != UserStatus.ACTIVE) throw BusinessException(CommonErrorCode.ACCOUNT_WITHDRAWN)
+        val certification = getCertificationOrThrow(certificationId)
+        if (!certification.isOwnedBy(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
+
+        cheerRepository.deleteByCertification_CertificationId(certificationId)
+        commentRepository.deleteByCertification_CertificationId(certificationId)
+        certificationRepository.delete(certification)
+        imageStorage.delete(certification.imageStorageKey)
+    }
+
     private fun toDetailResponse(certification: Certification, viewer: User): CertificationDetailResponse {
         val certificationId = requireNotNull(certification.certificationId)
         val cheerCount = cheerRepository.countByCertification_CertificationId(certificationId)

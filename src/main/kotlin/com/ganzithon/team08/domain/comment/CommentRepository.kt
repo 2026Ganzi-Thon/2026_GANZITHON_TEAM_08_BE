@@ -28,6 +28,8 @@ interface CommentRepository : JpaRepository<Comment, Long> {
             "group by c.certification.certificationId",
     )
     fun countByCertificationIds(@Param("certificationIds") certificationIds: Collection<Long>): List<CertificationCommentCount>
+
+    fun deleteByCertification_CertificationId(certificationId: Long)
 }
 
 interface CertificationCommentCount {

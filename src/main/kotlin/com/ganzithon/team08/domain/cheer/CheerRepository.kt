@@ -10,6 +10,8 @@ interface CheerRepository : JpaRepository<Cheer, Long> {
 
     fun countByCertification_CertificationId(certificationId: Long): Long
 
+    fun deleteByCertification_CertificationId(certificationId: Long)
+
     // 피드·날짜별 기록 등 여러 인증을 한 번에 보여줄 때 반복 쿼리 없이 인증별 응원 수를 모아 조회한다.
     @Query(
         "select c.certification.certificationId as certificationId, count(c) as cheerCount " +

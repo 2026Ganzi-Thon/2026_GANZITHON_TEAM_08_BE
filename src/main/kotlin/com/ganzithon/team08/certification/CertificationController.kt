@@ -11,6 +11,7 @@ import com.ganzithon.team08.global.storage.ImageFormat
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PatchMapping
@@ -50,6 +51,13 @@ class CertificationController(
         @PathVariable certificationId: Long,
         @RequestBody request: CertificationContentChangeRequest,
     ): CertificationDetailResponse = certificationService.changeContent(userId, certificationId, request.content)
+
+    @DeleteMapping("/api/certifications/{certificationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(
+        @CurrentUserId userId: Long,
+        @PathVariable certificationId: Long,
+    ) = certificationService.delete(userId, certificationId)
 
     @GetMapping("/api/images/{certificationId}")
     fun image(

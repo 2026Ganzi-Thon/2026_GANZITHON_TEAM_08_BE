@@ -7,6 +7,7 @@ import com.ganzithon.team08.domain.certification.CertificationRepository
 import com.ganzithon.team08.domain.certification.Visibility
 import com.ganzithon.team08.domain.cheer.Cheer
 import com.ganzithon.team08.domain.cheer.CheerRepository
+import com.ganzithon.team08.domain.comment.Comment
 import com.ganzithon.team08.domain.comment.CommentRepository
 import com.ganzithon.team08.domain.group.CareGroup
 import com.ganzithon.team08.domain.mission.Mission
@@ -393,6 +394,37 @@ class CertificationServiceTests @Autowired constructor(
         }
 
         assertEquals(CertificationErrorCode.CERT_INVALID_CONTENT, exception.errorCode)
+    }
+
+    @Test
+    fun ownerCanDeleteOwnCertificationAlongWithCheersAndComments() {
+        val fixture = fixture()
+        val certification = persist(certification(fixture))
+        entityManager.flush()
+        persist(Cheer(fixture.otherUser, certification))
+        persist(Comment(fixture.otherUser, certification, "댓글"))
+        entityManager.flush()
+        val certificationId = certification.certificationId!!
+
+        service(FakeImageStorage()).delete(fixture.user.userId!!, certificationId)
+        entityManager.flush()
+
+        assertEquals(0L, cheerRepository.countByCertification_CertificationId(certificationId))
+        assertEquals(0L, commentRepository.countByCertification_CertificationId(certificationId))
+        assertTrue(certificationRepository.findById(certificationId).isEmpty)
+    }
+
+    @Test
+    fun nonOwnerCannotDeleteCertification() {
+        val fixture = fixture()
+        val certification = persist(certification(fixture))
+        entityManager.flush()
+
+        val exception = assertThrows<BusinessException> {
+            service(FakeImageStorage()).delete(fixture.otherUser.userId!!, certification.certificationId!!)
+        }
+
+        assertEquals(CertificationErrorCode.CERT_FORBIDDEN, exception.errorCode)
     }
 
     private fun service(storage: ImageStorage): CertificationService {
