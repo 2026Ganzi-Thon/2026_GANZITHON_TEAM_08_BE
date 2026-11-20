@@ -353,6 +353,48 @@ class CertificationServiceTests @Autowired constructor(
         assertEquals(CertificationErrorCode.CERT_INVALID_VISIBILITY, exception.errorCode)
     }
 
+    @Test
+    fun ownerCanChangeContent() {
+        val fixture = fixture()
+        val certification = persist(certification(fixture))
+        entityManager.flush()
+
+        val detail = service(FakeImageStorage()).changeContent(
+            fixture.user.userId!!,
+            certification.certificationId!!,
+            "수정된 글입니다.",
+        )
+
+        assertEquals("수정된 글입니다.", detail.content)
+        assertEquals("수정된 글입니다.", certificationRepository.findById(certification.certificationId!!).orElseThrow().content)
+    }
+
+    @Test
+    fun nonOwnerCannotChangeContent() {
+        val fixture = fixture()
+        val certification = persist(certification(fixture))
+        entityManager.flush()
+
+        val exception = assertThrows<BusinessException> {
+            service(FakeImageStorage()).changeContent(fixture.otherUser.userId!!, certification.certificationId!!, "수정 시도")
+        }
+
+        assertEquals(CertificationErrorCode.CERT_FORBIDDEN, exception.errorCode)
+    }
+
+    @Test
+    fun changingContentToBlankIsRejected() {
+        val fixture = fixture()
+        val certification = persist(certification(fixture))
+        entityManager.flush()
+
+        val exception = assertThrows<BusinessException> {
+            service(FakeImageStorage()).changeContent(fixture.user.userId!!, certification.certificationId!!, "   ")
+        }
+
+        assertEquals(CertificationErrorCode.CERT_INVALID_CONTENT, exception.errorCode)
+    }
+
     private fun service(storage: ImageStorage): CertificationService {
         val missionAssignmentService = MissionAssignmentService(missionRepository, missionAssignmentRepository, userRepository)
         return CertificationService(userRepository, certificationRepository, cheerRepository, commentRepository, missionAssignmentService, storage) { bytes, _ -> bytes }

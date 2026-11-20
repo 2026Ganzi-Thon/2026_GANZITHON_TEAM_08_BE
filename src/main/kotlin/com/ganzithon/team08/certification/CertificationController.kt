@@ -1,6 +1,7 @@
 // 미션 인증 등록·조회·공개범위 변경과 인증 이미지 조회 HTTP 엔드포인트를 노출한다.
 package com.ganzithon.team08.certification
 
+import com.ganzithon.team08.certification.dto.CertificationContentChangeRequest
 import com.ganzithon.team08.certification.dto.CertificationDetailResponse
 import com.ganzithon.team08.certification.dto.CertificationRegisterRequest
 import com.ganzithon.team08.certification.dto.CertificationRegisterResponse
@@ -42,6 +43,13 @@ class CertificationController(
         @PathVariable certificationId: Long,
         @RequestBody request: CertificationVisibilityChangeRequest,
     ): CertificationDetailResponse = certificationService.changeVisibility(userId, certificationId, request.visibility)
+
+    @PatchMapping("/api/certifications/{certificationId}/content")
+    fun changeContent(
+        @CurrentUserId userId: Long,
+        @PathVariable certificationId: Long,
+        @RequestBody request: CertificationContentChangeRequest,
+    ): CertificationDetailResponse = certificationService.changeContent(userId, certificationId, request.content)
 
     @GetMapping("/api/images/{certificationId}")
     fun image(

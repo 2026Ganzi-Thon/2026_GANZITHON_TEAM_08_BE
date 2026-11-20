@@ -129,6 +129,16 @@ class CertificationService(
         return toDetailResponse(certification, viewer)
     }
 
+    @Transactional
+    fun changeContent(viewerId: Long, certificationId: Long, content: String): CertificationDetailResponse {
+        val viewer = userRepository.findForUpdate(viewerId) ?: throw BusinessException(CommonErrorCode.NOT_FOUND)
+        if (viewer.status != UserStatus.ACTIVE) throw BusinessException(CommonErrorCode.ACCOUNT_WITHDRAWN)
+        val certification = getCertificationOrThrow(certificationId)
+        if (!certification.isOwnedBy(viewer)) throw BusinessException(CertificationErrorCode.CERT_FORBIDDEN)
+        certification.changeContent(validateContent(content))
+        return toDetailResponse(certification, viewer)
+    }
+
     private fun toDetailResponse(certification: Certification, viewer: User): CertificationDetailResponse {
         val certificationId = requireNotNull(certification.certificationId)
         val cheerCount = cheerRepository.countByCertification_CertificationId(certificationId)

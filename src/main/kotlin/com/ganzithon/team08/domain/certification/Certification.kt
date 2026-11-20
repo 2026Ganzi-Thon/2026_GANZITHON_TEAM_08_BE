@@ -97,7 +97,7 @@ class Certification(
         imageSanitizeRetryAt = retryAt
     }
 
-    @field:Column(nullable = false, length = 300, updatable = false)
+    @field:Column(nullable = false, length = 300)
     @field:NotBlank
     @field:Size(min = 1, max = 300)
     var content: String = content
@@ -116,6 +116,11 @@ class Certification(
     fun changeVisibility(visibility: Visibility) {
         validateVisibility(visibility)
         this.visibility = visibility
+    }
+
+    fun changeContent(content: String) {
+        require(content.isNotBlank() && content.length <= 300) { "글은 1자 이상 300자 이하로 입력해 주세요." }
+        this.content = content
     }
 
     fun isOwnedBy(viewer: User): Boolean =
